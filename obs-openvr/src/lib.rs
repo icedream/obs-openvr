@@ -322,6 +322,7 @@ pub(crate) fn init_glfw() -> Result<glfw::Glfw, io::Error> {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)
         .map_err(|e| io::Error::new(ErrorKind::Other, format!("Error initializing GLFW: {}", &e)))?;
     trace!("glfw initialized");
+    #[cfg(not(feature = "show-context-window"))]
     glfw.window_hint(WindowHint::Visible(false));
     glfw.window_hint(WindowHint::ContextVersion(3, 2));
     Ok(glfw)
