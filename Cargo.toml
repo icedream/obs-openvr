@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+	"obs-openvr",
+	"obs-sys",
+	"openvr-sys",
+	"openvr",
+	"obs"
+]

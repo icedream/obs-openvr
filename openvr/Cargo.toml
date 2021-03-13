@@ -1,0 +1,22 @@
+[package]
+name = "openvr"
+version = "0.1.0"
+authors = ["Matt Coffin <mcoffin13@gmail.com>"]
+edition = "2018"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4"
+libc = "*"
+
+[dependencies.openvr-sys]
+path = "../openvr-sys"
+
+[build-dependencies.cc]
+version = "^1.0.0"
+features = ["parallel"]
+
+[build-dependencies]
+pkg-config = "0.3"
