@@ -31,3 +31,5 @@ features = ["parallel"]
 
 [features]
 log-render-time = []
+no-lock = ["openvr/no-lock"]
+save-image = []

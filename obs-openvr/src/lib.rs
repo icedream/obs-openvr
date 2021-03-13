@@ -240,9 +240,9 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
     fn video_render(&self, effect: *mut obs::sys::gs_effect_t) {
         use std::borrow::Cow;
         use openvr::headset_view::HeadsetView;
-        use timing::Timer;
+        use timing::{Timer, TimerExt};
         #[cfg(feature = "log-render-time")]
-        let render_timer = Timer::new();
+        let mut render_timer = Timer::new();
         let format = TextureFormat::Rgba;
         let result = obs::graphics::isolate_context(|| {
             self.make_current();
@@ -255,6 +255,8 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
                     warn!("failed to get headset view size");
                 }
 
+                #[cfg(feature = "log-render-time")]
+                render_timer.log_checkpoint_ms("pre-copy");
                 let _copy_result = {
                     let _lock = unsafe { self.texture_info.lock() };
                     // TODO: actually fix headset dimensions to not be hard-coded
@@ -262,6 +264,9 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
                         .map_err(|e| format!("copy_texture failed with error: {}", e))
                         .map_err(Cow::Owned)
                 }?;
+                #[cfg(feature = "log-render-time")]
+                render_timer.log_checkpoint_ms("copy");
+                #[cfg(feature = "save-image")]
                 {
                     let buffer = {
                         let buffer = ctx.image_buffer().unwrap();
@@ -295,6 +300,8 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
                     .unwrap()
             };
             obs::source::draw(&mut texture, 0, 0, 0, 0, false);
+            #[cfg(feature = "log-render-time")]
+            render_timer.log_checkpoint_ms("draw");
             Ok(())
         });
         if let Err(e) = result {

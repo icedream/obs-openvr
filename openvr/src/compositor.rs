@@ -15,6 +15,7 @@ pub struct MirrorTextureLock<'a>(sys::glSharedTextureHandle_t, PhantomData<&'a M
 impl<'a> MirrorTextureLock<'a> {
     unsafe fn new(handle: sys::glSharedTextureHandle_t) -> Self {
         trace!("locking shared gl texture: {:x}", handle as usize);
+        #[cfg(not(feature = "no-lock"))]
         obs_openvr_vrcompositor_locksharedgltexture(handle);
         MirrorTextureLock(handle, PhantomData {})
     }
@@ -24,6 +25,7 @@ impl<'a> Drop for MirrorTextureLock<'a> {
     fn drop(&mut self) {
         unsafe {
             trace!("unlocking shared gl texture: {:x}", self.0 as usize);
+            #[cfg(not(feature = "no-lock"))]
             obs_openvr_vrcompositor_unlocksharedgltexture(self.0);
         }
     }
@@ -70,6 +72,8 @@ pub unsafe fn get_mirror_texture_gl(eye: sys::EVREye) -> Result<MirrorTextureInf
 
 extern "C" {
     pub fn obs_openvr_vrcompositor_getmirrortexturegl(eye: sys::EVREye, tex_id: *mut sys::glUInt_t, tex_handle: *mut sys::glSharedTextureHandle_t) -> sys::EVRCompositorError;
+    #[allow(dead_code)]
     fn obs_openvr_vrcompositor_locksharedgltexture(handle: sys::glSharedTextureHandle_t);
+    #[allow(dead_code)]
     fn obs_openvr_vrcompositor_unlocksharedgltexture(handle: sys::glSharedTextureHandle_t);
 }
