@@ -8,6 +8,7 @@ use std::{
     },
     marker::PhantomData,
 };
+use crate::graphics as gs;
 
 pub struct RawSourceInfo<'a>(pub sys::obs_source_info, PhantomData<&'a ()>);
 
@@ -152,4 +153,10 @@ unsafe extern "C" fn video_source_destroy<S: VideoSource>(data: *mut libc::c_voi
     let data: *mut S = mem::transmute(data);
     let ptr = Box::from_raw(data);
     mem::drop(ptr);
+}
+
+pub fn draw(image: &mut gs::Texture, x: libc::c_int, y: libc::c_int, cx: u32, cy: u32, flip: bool) {
+    unsafe {
+        sys::obs_source_draw(image.as_mut(), x, y, cx, cy, flip);
+    }
 }

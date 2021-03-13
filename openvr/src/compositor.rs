@@ -63,12 +63,13 @@ impl Drop for MirrorTextureInfo {
 
 pub unsafe fn get_mirror_texture_gl(eye: sys::EVREye) -> Result<MirrorTextureInfo, sys::EVRCompositorError> {
     let mut info = MirrorTextureInfo::empty();
-    let e = util::obs_openvr_vrcompositor_getmirrortexturegl(eye, &mut info.id as *mut _, &mut info.handle as *mut _);
+    let e = obs_openvr_vrcompositor_getmirrortexturegl(eye, &mut info.id as *mut _, &mut info.handle as *mut _);
     e.into_result()
         .map(|_| info)
 }
 
 extern "C" {
+    pub fn obs_openvr_vrcompositor_getmirrortexturegl(eye: sys::EVREye, tex_id: *mut sys::glUInt_t, tex_handle: *mut sys::glSharedTextureHandle_t) -> sys::EVRCompositorError;
     fn obs_openvr_vrcompositor_locksharedgltexture(handle: sys::glSharedTextureHandle_t);
     fn obs_openvr_vrcompositor_unlocksharedgltexture(handle: sys::glSharedTextureHandle_t);
 }

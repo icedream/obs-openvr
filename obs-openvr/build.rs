@@ -78,6 +78,8 @@ fn main() {
             .define("DEBUG", Some("1"));
     }
     vr_utils_build
+        .flag("-std=c11")
+        .flag("-Wno-unused-parameter")
         .include("src")
         .file("src/utils.c")
         .compile(LIBRARY_NAME);

@@ -66,14 +66,9 @@ void obs_openvr_copy_context_destroy(struct obs_openvr_copy_context *ctx) {
 	free(ctx);
 }
 
-static size_t get_bytes_per_pixel(GLenum format) {
-	// TODO: actually implement
-	return 3;
-}
-
 void obs_openvr_copy_context_ensure_size(struct obs_openvr_copy_context *ctx, GLsizei width, GLsizei height, GLenum format) {
 	debug_printf("obs_openvr_copy_context_ensure_size(%p, %d, %d)\n", ctx, width, height);
-	const size_t n = width * height * get_bytes_per_pixel(format);
+	const size_t n = width * height * obs_openvr_bytes_per_pixel(format);
 	if (ctx->img == NULL || ctx->img_size < n) {
 		if (ctx->img != NULL) {
 			debug_printf("reallocating img with dimensions: (%d, %d)\n", width, height);
@@ -82,7 +77,8 @@ void obs_openvr_copy_context_ensure_size(struct obs_openvr_copy_context *ctx, GL
 		} else {
 			debug_printf("allocating new img with dimensions: (%d, %d) size: %lu\n", width, height, n);
 		}
-		ctx->img = malloc(n * 10); // TODO: figure out why the size isn't right
+		// ctx->img = malloc(n * 10); // TODO: figure out why the size isn't right
+		ctx->img = malloc(n);
 		if (ctx->img == NULL) {
 			debug_printf("allocation of img FAILED\n");
 		}

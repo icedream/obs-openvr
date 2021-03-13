@@ -1,5 +1,10 @@
 use obs_sys as sys;
 
+use std::{
+    marker::PhantomData,
+    ptr,
+};
+
 /// Saves the obs graphics context, runs the provided function, then restores the original graphics
 /// context
 pub fn isolate_context<Ret, F>(f: F) -> Ret where
@@ -34,4 +39,44 @@ pub fn with_graphics<Ret, F: FnOnce() -> Ret>(f: F) -> Ret {
     let ret = f();
     unsafe { leave_graphics(); }
     ret
+}
+
+pub struct Texture<'a>(*mut sys::gs_texture_t, PhantomData<&'a [u8]>);
+
+impl<'a> Texture<'a> {
+    pub unsafe fn new(width: u32, height: u32, format: sys::gs_color_format, levels: u32, data: &'a mut *const u8, flags: u32) -> Option<Self> {
+        let p = sys::gs_texture_create(width, height, format, levels, data as *mut _, flags);
+        if p.is_null() {
+            None
+        } else {
+            Some(Texture(p, PhantomData {}))
+        }
+    }
+
+    #[inline(always)]
+    pub fn as_ptr(&self) -> *const sys::gs_texture_t {
+        self.0 as *const _
+    }
+
+    #[inline(always)]
+    pub fn as_mut(&mut self) -> *mut sys::gs_texture_t {
+        self.0
+    }
+
+    pub unsafe fn leak(&mut self) -> *mut sys::gs_texture_t {
+        let ret = self.0;
+        self.0 = ptr::null_mut();
+        ret
+    }
+}
+
+impl<'a> Drop for Texture<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            let p = self.leak();
+            if !p.is_null() {
+                sys::gs_texture_destroy(p);
+            }
+        }
+    }
 }

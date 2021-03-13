@@ -32,3 +32,4 @@ extern struct obs_openvr_copy_context *obs_openvr_copy_context_create(GLuint tex
 extern void obs_openvr_copy_context_destroy(struct obs_openvr_copy_context *ctx);
 extern int obs_openvr_copy_texture(struct obs_openvr_copy_context *ctx, GLsizei width, GLsizei height, GLenum format);
 extern void obs_openvr_copy_context_ensure_size(struct obs_openvr_copy_context *ctx, GLsizei width, GLsizei height, GLenum format);
+extern uint8_t obs_openvr_bytes_per_pixel(GLenum format);

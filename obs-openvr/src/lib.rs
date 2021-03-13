@@ -10,6 +10,7 @@ pub use obs::sys as obs_sys;
 mod logging;
 pub mod module;
 pub(crate) mod native_utils;
+mod timing;
 
 pub use openvr::sys as openvr_sys;
 
@@ -34,9 +35,12 @@ use std::{
     path::Path,
 };
 use openvr::compositor::MirrorTextureInfo;
-use native_utils::CopyContext;
+use native_utils::{
+    CopyContext,
+    TextureFormat,
+};
 use image::{
-    Rgb,
+    Rgba,
     ImageBuffer,
 };
 
@@ -62,11 +66,11 @@ struct OpenVRMirrorSource {
     eye: openvr::sys::EVREye,
     texture_info: MirrorTextureInfo,
     copy_context: Option<RwLock<CopyContext>>,
-    save_sender: Option<Sender<ImageBuffer<Rgb<u8>, Vec<u8>>>>,
+    save_sender: Option<Sender<ImageBuffer<Rgba<u8>, Vec<u8>>>>,
     save_thread: Option<thread::JoinHandle<()>>,
 }
 
-type ObsOpenVRImageBuffer = ImageBuffer<Rgb<u8>, Vec<u8>>;
+type ObsOpenVRImageBuffer = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
 impl OpenVRMirrorSource {
     pub fn new(handle: *mut obs::sys::obs_source) -> Self {
@@ -179,6 +183,7 @@ impl Drop for OpenVRMirrorSource {
 }
 
 const MAX_SIZE: libc::c_int = 100000;
+const HEADSET_DIMENSIONS: (u32, u32) = (2468, 2740);
 
 impl obs::source::VideoSource for OpenVRMirrorSource {
     const ID: &'static [u8] = b"obs-openvr-mirror\0";
@@ -193,11 +198,13 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
     }
 
     fn get_width(&self) -> u32 {
-        self.width.unwrap_or(Self::DEFAULT_DIMENSIONS.0)
+        // self.width.unwrap_or(Self::DEFAULT_DIMENSIONS.0)
+        HEADSET_DIMENSIONS.0
     }
 
     fn get_height(&self) -> u32 {
-        self.height.unwrap_or(Self::DEFAULT_DIMENSIONS.1)
+        // self.height.unwrap_or(Self::DEFAULT_DIMENSIONS.1)
+        HEADSET_DIMENSIONS.1
     }
 
     fn get_properties(&self) -> *mut obs::sys::obs_properties {
@@ -231,8 +238,13 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
     }
 
     fn video_render(&self, effect: *mut obs::sys::gs_effect_t) {
+        use std::borrow::Cow;
         use openvr::headset_view::HeadsetView;
-        obs::graphics::isolate_context(|| {
+        use timing::Timer;
+        #[cfg(feature = "log-render-time")]
+        let render_timer = Timer::new();
+        let format = TextureFormat::Rgba;
+        let result = obs::graphics::isolate_context(|| {
             self.make_current();
             if let Some(mut ctx) = self.copy_context.as_ref().map(|r| r.write().unwrap()) {
                 if let Some(headset_view) = HeadsetView::global() {
@@ -242,25 +254,56 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
                 } else {
                     warn!("failed to get headset view size");
                 }
-                {
+
+                let _copy_result = {
                     let _lock = unsafe { self.texture_info.lock() };
-                    ctx.copy_texture(2016, 2240, 0x1907)
-                        .expect("Failed to copy texture to CPU memory");
+                    // TODO: actually fix headset dimensions to not be hard-coded
+                    ctx.copy_texture(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, format)
+                        .map_err(|e| format!("copy_texture failed with error: {}", e))
+                        .map_err(Cow::Owned)
+                }?;
+                {
+                    let buffer = {
+                        let buffer = ctx.image_buffer().unwrap();
+                        Vec::from(buffer)
+                    };
+                    let img_size = ctx.img_size();
+                    trace!("creating ImageBuffer (lower size: {})", img_size);
+                    let buffer: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, buffer).unwrap();
+                    if let Err(e) = self.save_sender.as_ref().unwrap().send(buffer) {
+                        warn!("save thread seems to be dead: {:?}", &e);
+                    }
                 }
-                let buffer = {
-                    let buffer = ctx.image_buffer().unwrap();
-                    Vec::from(buffer)
-                };
-                let img_size = ctx.img_size();
-                trace!("creating ImageBuffer (lower size: {})", img_size);
-                let buffer: ImageBuffer<Rgb<u8>, _> = ImageBuffer::from_raw(2016, 2240, buffer).unwrap();
-                if let Err(e) = self.save_sender.as_ref().unwrap().send(buffer) {
-                    warn!("save thread seems to be dead: {:?}", &e);
-                }
+                Ok(ctx)
+                // let buffer: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, buffer).unwrap();
+                // Ok(buffer.as_raw().as_ptr())
             } else {
-                error!("obs_openvr: we had no copy_context wtf");
+                Err(Cow::Borrowed("we had no copy_context wtf"))
             }
         });
+        let result = result.and_then(|ctx| {
+            let buffer = ctx.image_buffer()
+                .map(Ok)
+                .unwrap_or(Err(Cow::Borrowed("image buffer didn't exist any more wtf")))?;
+            let mut buffer = buffer.as_ptr();
+            let obs_format: Option<obs::sys::gs_color_format> = format.into();
+            let obs_format = obs_format
+                .map(Ok)
+                .unwrap_or_else(|| Err(Cow::Owned(format!("format cannot be used with obs: {:?}", &format))))?;
+            let mut texture = unsafe {
+                obs::graphics::Texture::new(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, obs_format, 1, &mut buffer, 0)
+                    .unwrap()
+            };
+            obs::source::draw(&mut texture, 0, 0, 0, 0, false);
+            Ok(())
+        });
+        if let Err(e) = result {
+            error!("{}", e);
+        }
+        #[cfg(feature = "log-render-time")]
+        {
+            info!("video_render took {}ms", render_timer.elapsed_ms());
+        }
     }
 }
 
@@ -272,7 +315,7 @@ pub(crate) fn init_glfw() -> Result<glfw::Glfw, io::Error> {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)
         .map_err(|e| io::Error::new(ErrorKind::Other, format!("Error initializing GLFW: {}", &e)))?;
     trace!("glfw initialized");
-    // glfw.window_hint(WindowHint::Visible(false));
+    glfw.window_hint(WindowHint::Visible(false));
     glfw.window_hint(WindowHint::ContextVersion(3, 2));
     Ok(glfw)
 }

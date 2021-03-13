@@ -1,4 +1,5 @@
 use std::{
+    mem,
     ops::Deref,
     slice,
     sync::Once,
@@ -71,9 +72,9 @@ impl CopyContext {
         }
     }
 
-    pub fn copy_texture(&mut self, width: u32, height: u32, format: u32) -> Result<(), i32> {
+    pub fn copy_texture(&mut self, width: u32, height: u32, format: TextureFormat) -> Result<(), i32> {
         let status = unsafe {
-            obs_openvr_copy_texture(self.0, width, height, format)
+            obs_openvr_copy_texture(self.0, width, height, format.into())
         };
         status_to_result(status)
     }
@@ -83,6 +84,47 @@ impl Drop for CopyContext {
     fn drop(&mut self) {
         unsafe {
             obs_openvr_copy_context_destroy(self.0);
+        }
+    }
+}
+
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextureFormat {
+    Rgb = 0x1907,
+    Rgba = 0x1908,
+}
+
+impl TextureFormat {
+    pub fn bytes_per_pixel(self) -> u8 {
+        match self {
+            TextureFormat::Rgb => 3,
+            TextureFormat::Rgba => 4,
+        }
+    }
+
+    pub fn to_gs_format(self) -> Option<obs::sys::gs_color_format> {
+        self.into()
+    }
+}
+
+#[no_mangle]
+extern "C" fn obs_openvr_bytes_per_pixel(format: TextureFormat) -> u8 {
+    format.bytes_per_pixel()
+}
+
+impl Into<u32> for TextureFormat {
+    fn into(self) -> u32 {
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl Into<Option<obs::sys::gs_color_format>> for TextureFormat {
+    fn into(self) -> Option<obs::sys::gs_color_format> {
+        use obs::sys::gs_color_format::*;
+        match self {
+            TextureFormat::Rgb => None,
+            TextureFormat::Rgba => Some(GS_RGBA),
         }
     }
 }
