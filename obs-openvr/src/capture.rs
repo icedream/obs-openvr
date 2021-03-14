@@ -91,8 +91,8 @@ impl OpenVRCapture {
                 let obs_format: Option<obs::sys::gs_color_format> = format.into();
                 let obs_format = obs_format.unwrap();
 
-                let do_loop = || {
-                    let result = obs::graphics::isolate_context(|| {
+                let do_loop = || -> Result<(), Cow<'static, str>> {
+                    obs::graphics::isolate_context(|| {
                         let mut ctx = copy_context.write().unwrap();
                         let texture_info = texture_info.read().unwrap();
                         let _copy_result = {
@@ -101,19 +101,6 @@ impl OpenVRCapture {
                                 .map_err(|e| format!("copy_texture failed with error: {}", e))
                                 .map_err(Cow::Owned)
                         }?;
-                        Ok(ctx)
-                    });
-                    result.and_then(|ctx| -> Result<(), Cow<'static, str>> {
-                        let buffer = ctx.image_buffer()
-                            .map(Ok)
-                            .unwrap_or(Err(Cow::Borrowed("image buffer doesn't exist anymore wtf")))?;
-                        let mut buffer = buffer.as_ptr();
-                        let mut texture = unsafe {
-                            obs::graphics::Texture::new(width, height, obs_format, 1, &mut buffer, 0)
-                                .map(Ok)
-                                .unwrap_or(Err(Cow::Borrowed("gs_create_texture failed")))
-                        }?;
-                        obs::source::draw(&mut texture, 0, 0, 0, 0, false);
                         Ok(())
                     })
                 };
