@@ -60,12 +60,14 @@ pub struct OpenVRCapture {
     format: TextureFormat,
 }
 
+const HIDDEN_WINDOW_DIMENSIONS: (u32, u32) = (1920, 1080);
+
 impl OpenVRCapture {
-    pub fn new(eye: openvr::sys::EVREye, width: u32, height: u32, interval: Option<Duration>) -> Result<Self, io::Error> {
+    pub fn new(eye: openvr::sys::EVREye, interval: Option<Duration>) -> Result<Self, io::Error> {
         let format = TextureFormat::Rgba;
         let glfw = init_glfw()
             .map_err(|e| io::Error::new(ErrorKind::Other, format!("Failed to initialize GLFW: {}", &e)))?;
-        let (mut window, events) = glfw.create_window(width, height, "", glfw::WindowMode::Windowed)
+        let (mut window, events) = glfw.create_window(HIDDEN_WINDOW_DIMENSIONS.0, HIDDEN_WINDOW_DIMENSIONS.1, "", glfw::WindowMode::Windowed)
             .map(Ok)
             .unwrap_or_else(|| Err(io::Error::new(ErrorKind::Other, "Failed to create GLFW offscreen window")))?;
         window.set_close_polling(true);
@@ -80,6 +82,13 @@ impl OpenVRCapture {
 
         let copy_context = Arc::new(RwLock::new(CopyContext::new(texture_info.id).unwrap()));
         let texture_info = Arc::new(RwLock::new(texture_info));
+
+        let texture_size = obs::graphics::isolate_context(|| {
+            window.make_current();
+            let copy_context = copy_context.read().unwrap();
+            copy_context.get_size()
+        });
+        info!("OpenVR texture size: {:?}", &texture_size);
 
         let running = Arc::new(AtomicBool::new(true));
         let copy_thread = {
@@ -97,7 +106,7 @@ impl OpenVRCapture {
                         let texture_info = texture_info.read().unwrap();
                         let _copy_result = {
                             let _lock = unsafe { texture_info.lock() };
-                            ctx.copy_texture(width, height, format)
+                            ctx.copy_texture(texture_size.width, texture_size.height, format)
                                 .map_err(|e| format!("copy_texture failed with error: {}", e))
                                 .map_err(Cow::Owned)
                         }?;
@@ -118,7 +127,7 @@ impl OpenVRCapture {
             glfw: glfw,
             window: window,
             events: events,
-            dimensions: (width, height),
+            dimensions: (texture_size.width, texture_size.height),
             eye: eye,
             texture_info: texture_info,
             interval: interval,

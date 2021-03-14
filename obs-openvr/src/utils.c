@@ -85,6 +85,11 @@ void obs_openvr_copy_context_ensure_size(struct obs_openvr_copy_context *ctx, GL
 		ctx->img_size = n;
 	}
 }
+void obs_openvr_copy_context_get_texture_size(struct obs_openvr_copy_context *ctx, struct obs_openvr_texture_size *out) {
+	glBindTexture(GL_TEXTURE_2D, ctx->texture);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &out->width);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &out->height);
+}
 
 int obs_openvr_copy_texture(struct obs_openvr_copy_context *ctx, GLsizei width, GLsizei height, GLenum format) {
 	debug_printf("obs_openvr_copy_texture(%p, %d, %d, %x)\n", ctx, width, height, format);

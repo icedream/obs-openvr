@@ -73,7 +73,7 @@ const DEFAULT_EYE: openvr::sys::EVREye = openvr::sys::EVREye::EVREye_Eye_Left;
 impl OpenVRMirrorSource {
     pub fn new(handle: *mut obs::sys::obs_source) -> Self {
         let eye = DEFAULT_EYE;
-        let capture_context = OpenVRCapture::new(eye, HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, None)
+        let capture_context = OpenVRCapture::new(eye, None)
             .expect("failed to create capture context");
         trace!("OpenVRMirrorSource::create()");
         OpenVRMirrorSource {
@@ -124,7 +124,7 @@ impl Drop for OpenVRMirrorSource {
 }
 
 const MAX_SIZE: libc::c_int = 100000;
-const HEADSET_DIMENSIONS: (u32, u32) = (2468, 2740);
+// const HEADSET_DIMENSIONS: (u32, u32) = (2468, 2740);
 
 impl obs::source::VideoSource for OpenVRMirrorSource {
     const ID: &'static [u8] = b"obs-openvr-mirror\0";
@@ -140,12 +140,12 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
 
     fn get_width(&self) -> u32 {
         // self.width.unwrap_or(Self::DEFAULT_DIMENSIONS.0)
-        HEADSET_DIMENSIONS.0
+        self.capture_context.dimensions().0
     }
 
     fn get_height(&self) -> u32 {
         // self.height.unwrap_or(Self::DEFAULT_DIMENSIONS.1)
-        HEADSET_DIMENSIONS.1
+        self.capture_context.dimensions().1
     }
 
     fn get_properties(&self) -> *mut obs::sys::obs_properties {
@@ -153,14 +153,12 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         unsafe {
             use obs::sys as sys;
             use ffi::CStr;
+
             let mut props = obs::properties::Properties::new();
-            let width_name: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"width\0");
-            let height_name: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"height\0");
+
             let eye_name: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"eye\0");
             let left_eye: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"left\0");
             let right_eye: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"right\0");
-            props.add_int(width_name, width_name, 0, MAX_SIZE, 1);
-            props.add_int(height_name, height_name, 0, MAX_SIZE, 1);
             {
                 let mut eye_list = props.add_string_list(PropertyDescription::new(eye_name, None), false);
                 eye_list.add_string(left_eye, left_eye);
@@ -187,10 +185,11 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
             error!("image buffer doesn't exist");
             return;
         };
-        let buffer: ImageBuffer<Rgba<u8>, _> = match ImageBuffer::from_raw(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, buffer) {
+        let dimensions = self.capture_context.dimensions();
+        let buffer: ImageBuffer<Rgba<u8>, _> = match ImageBuffer::from_raw(dimensions.0, dimensions.1, buffer) {
             Some(v) => v,
             None =>  {
-                error!("image buffer wasn't big enough to fit {}x{} image", HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1);
+                error!("image buffer wasn't big enough to fit {}x{} image", dimensions.0, dimensions.1);
                 return;
             },
         };

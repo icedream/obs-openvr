@@ -4,5 +4,5 @@ OpenVR capture plugin for [`obs-studio`](https://github.com/obsproject/obs-studi
 
 This plugin is **not** ready for prime-time yet. The checklist of remaining items for it to be ready can be found below.
 
-- [ ] Find a way to derive size of textures given by `IVRCompositor`, so get rid of the hard-coded sizes
+- [x] Find a way to derive size of textures given by `IVRCompositor`, so get rid of the hard-coded sizes
 - [ ] Implement `update()` method from OBS source API to actually obey properties set by user

@@ -20,6 +20,12 @@ vr::IVRHeadsetView *openvr_utils_get_headset_view() {
 void obs_openvr_init_openvr(vr::EVRInitError *e, vr::EVRApplicationType application_type)
 {
 	vr::VR_Init(e, application_type);
+	if (*e != vr::VRInitError_None) {
+		return;
+	}
+	uint32_t w, h;
+	vr::VRSystem()->GetRecommendedRenderTargetSize(&w, &h);
+	std::cout << "obs_openvr: render target size: (" << w << ", " << h << ")" << std::endl;
 }
 
 void obs_openvr_shutdown_openvr()

@@ -6,6 +6,13 @@ use std::{
 };
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextureSize {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CopyCtx {
     pub texture: u32,
@@ -28,6 +35,17 @@ impl CopyCtx {
                 Some(slice::from_raw_parts(self.img as *const u8, self.img_size as usize))
             }
         }
+    }
+
+    pub fn get_size(&self) -> TextureSize {
+        let mut ret = TextureSize {
+            width: 0,
+            height: 0,
+        };
+        unsafe {
+            obs_openvr_copy_context_get_texture_size(self as *const CopyCtx, &mut ret as *mut _);
+        }
+        ret
     }
 }
 
@@ -137,4 +155,5 @@ extern "C" {
     fn obs_openvr_copy_context_create(texture: u32) -> *mut CopyCtx;
     fn obs_openvr_copy_context_destroy(ctx: *mut CopyCtx);
     fn obs_openvr_copy_texture(ctx: *mut CopyCtx, width: u32, height: u32, format: u32) -> i32;
+    fn obs_openvr_copy_context_get_texture_size(ctx: *const CopyCtx, out: *mut TextureSize);
 }
