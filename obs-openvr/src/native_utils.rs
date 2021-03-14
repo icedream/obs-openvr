@@ -41,6 +41,9 @@ impl Deref for CopyContext {
     }
 }
 
+unsafe impl Send for CopyContext {}
+unsafe impl Sync for CopyContext {}
+
 static INITIALIZE: Once = Once::new();
 
 fn init() {

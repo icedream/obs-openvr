@@ -11,6 +11,7 @@ mod logging;
 pub mod module;
 pub(crate) mod native_utils;
 mod timing;
+mod capture;
 
 pub use openvr::sys as openvr_sys;
 
@@ -43,6 +44,7 @@ use image::{
     Rgba,
     ImageBuffer,
 };
+use capture::OpenVRCapture;
 
 pub(crate) const CRATE_NAME: &'static str = env!("CARGO_CRATE_NAME");
 
@@ -57,65 +59,30 @@ static FILL_INFO: Once = Once::new();
 static mut SOURCE_INFO: Option<obs_sys::obs_source_info> = None;
 
 struct OpenVRMirrorSource {
-    glfw: RwLock<glfw::Glfw>,
-    window: Arc<RwLock<glfw::Window>>,
-    events: Receiver<(f64, glfw::WindowEvent)>,
     handle: *mut obs::sys::obs_source,
     width: Option<u32>,
     height: Option<u32>,
     eye: openvr::sys::EVREye,
-    texture_info: MirrorTextureInfo,
-    copy_context: Option<RwLock<CopyContext>>,
-    save_sender: Option<Sender<ImageBuffer<Rgba<u8>, Vec<u8>>>>,
-    save_thread: Option<thread::JoinHandle<()>>,
+    capture_context: OpenVRCapture,
 }
 
 type ObsOpenVRImageBuffer = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
+const DEFAULT_EYE: openvr::sys::EVREye = openvr::sys::EVREye::EVREye_Eye_Left;
+
 impl OpenVRMirrorSource {
     pub fn new(handle: *mut obs::sys::obs_source) -> Self {
+        let eye = DEFAULT_EYE;
+        let capture_context = OpenVRCapture::new(eye, HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, None)
+            .expect("failed to create capture context");
         trace!("OpenVRMirrorSource::create()");
-        let glfw = init_glfw().expect("Failed to initialize GLFW");
-        let (mut window, events) = glfw.create_window(OpenVRMirrorSource::DEFAULT_DIMENSIONS.0, OpenVRMirrorSource::DEFAULT_DIMENSIONS.1, "", glfw::WindowMode::Windowed)
-            .map(Ok)
-            .unwrap_or_else(|| Err("Failed to create GLFW offscreen window"))
-            .unwrap();
-        window.set_close_polling(true);
-        let (save_sender, save_receiver) = mpsc::channel::<ObsOpenVRImageBuffer>();
-        let save_thread = thread::spawn(move || {
-            use std::time::{Instant, Duration};
-            let mut last_saved: Option<Instant> = None;
-            let image_path: &'static Path = "/home/mcoffin/obs-openvr.png".as_ref();
-            while let Ok(buffer) = save_receiver.recv() {
-                let now = Instant::now();
-                let should_skip = last_saved
-                    .map(|t| now.duration_since(t) < Duration::from_secs(5))
-                    .unwrap_or(false);
-                if should_skip {
-                    continue;
-                }
-                last_saved = Some(now);
-                trace!("Saving image buffer to: {}", image_path.display());
-                if let Err(e) = buffer.save(image_path) {
-                    error!("Error saving image buffer: {:?}", &e);
-                }
-            }
-        });
-        let mut ret = OpenVRMirrorSource {
-            glfw: RwLock::new(glfw),
+        OpenVRMirrorSource {
             handle: handle,
-            window: Arc::new(RwLock::new(window)),
-            events: events,
             width: None,
             height: None,
-            eye: openvr::sys::EVREye::EVREye_Eye_Left,
-            texture_info: MirrorTextureInfo::empty(),
-            copy_context: None,
-            save_sender: Some(save_sender),
-            save_thread: Some(save_thread),
-        };
-        ret.fill_mirror_texture();
-        ret
+            eye: eye,
+            capture_context: capture_context,
+        }
     }
 
     #[inline(always)]
@@ -143,22 +110,6 @@ impl OpenVRMirrorSource {
     // }
 
 
-    fn fill_mirror_texture(&mut self) {
-        obs::graphics::isolate_context(|| {
-            self.make_current();
-            self.texture_info = unsafe { openvr::compositor::get_mirror_texture_gl(openvr::sys::EVREye::EVREye_Eye_Left).expect("Failed to get mirror texture") };
-            trace!("creating copy context");
-            self.copy_context = Some(RwLock::new(CopyContext::new(self.texture_info.id).unwrap()));
-            trace!("texture_info: {:?}", &self.texture_info);
-        });
-    }
-
-    fn make_current(&self) {
-        use glfw::Context;
-        let mut window = self.window.write().unwrap();
-        window.make_current();
-    }
-
     pub fn dimensions(&self) -> (u32, u32) {
         (self.width.unwrap_or(0), self.height.unwrap_or(0))
     }
@@ -169,16 +120,6 @@ impl OpenVRMirrorSource {
 impl Drop for OpenVRMirrorSource {
     fn drop(&mut self) {
         trace!("OpenVRMirrorSource::drop()");
-        mem::drop(self.save_sender.take());
-        if let Some(t) = self.save_thread.take() {
-            trace!("joining save_thread");
-            if let Err(e) = t.join() {
-                warn!("save thread failed with error: {:?}", &e);
-            }
-            trace!("save thread finished");
-        } else {
-            warn!("save thread didn't exist at drop time");
-        }
     }
 }
 
@@ -229,88 +170,42 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         }
     }
 
-    fn video_tick(&self, _seconds: f32) {
-        let window = self.window.read().unwrap();
-        if !window.should_close() {
-            let mut glfw = self.glfw.write().unwrap();
-            glfw.poll_events();
-        }
-    }
-
     fn video_render(&self, effect: *mut obs::sys::gs_effect_t) {
-        use std::borrow::Cow;
-        use openvr::headset_view::HeadsetView;
-        use timing::{Timer, TimerExt};
         #[cfg(feature = "log-render-time")]
-        let mut render_timer = Timer::new();
-        let format = TextureFormat::Rgba;
-        let result = obs::graphics::isolate_context(|| {
-            self.make_current();
-            if let Some(mut ctx) = self.copy_context.as_ref().map(|r| r.write().unwrap()) {
-                if let Some(headset_view) = HeadsetView::global() {
-                    trace!("headset view size: {:?}", headset_view.get_size());
-                    trace!("headset view aspect ratio: {}", headset_view.get_aspect_ratio());
-                    trace!("headset view mode: {:?}", headset_view.get_mode());
-                } else {
-                    warn!("failed to get headset view size");
-                }
-
-                #[cfg(feature = "log-render-time")]
-                render_timer.log_checkpoint_ms("pre-copy");
-                let _copy_result = {
-                    let _lock = unsafe { self.texture_info.lock() };
-                    // TODO: actually fix headset dimensions to not be hard-coded
-                    ctx.copy_texture(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, format)
-                        .map_err(|e| format!("copy_texture failed with error: {}", e))
-                        .map_err(Cow::Owned)
-                }?;
-                #[cfg(feature = "log-render-time")]
-                render_timer.log_checkpoint_ms("copy");
-                #[cfg(feature = "save-image")]
-                {
-                    let buffer = {
-                        let buffer = ctx.image_buffer().unwrap();
-                        Vec::from(buffer)
-                    };
-                    let img_size = ctx.img_size();
-                    trace!("creating ImageBuffer (lower size: {})", img_size);
-                    let buffer: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, buffer).unwrap();
-                    if let Err(e) = self.save_sender.as_ref().unwrap().send(buffer) {
-                        warn!("save thread seems to be dead: {:?}", &e);
-                    }
-                }
-                Ok(ctx)
-                // let buffer: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, buffer).unwrap();
-                // Ok(buffer.as_raw().as_ptr())
+        use timing::{
+            Timer,
+            TimerExt,
+        };
+        #[cfg(feature = "log-render-time")]
+        let mut timer = Timer::new();
+        let (width, height) = self.capture_context.dimensions();
+        let copy_context = self.capture_context.copy_context();
+        let format = self.capture_context.obs_format().unwrap();
+        let buffer = if let Some(buf) = copy_context.image_buffer() {
+            buf
+        } else {
+            error!("image buffer doesn't exist");
+            return;
+        };
+        let buffer: ImageBuffer<Rgba<u8>, _> = match ImageBuffer::from_raw(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, buffer) {
+            Some(v) => v,
+            None =>  {
+                error!("image buffer wasn't big enough to fit {}x{} image", HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1);
+                return;
+            },
+        };
+        let mut buffer = buffer.as_raw().as_ptr();
+        let mut texture = unsafe {
+            if let Some(texture) = obs::graphics::Texture::new(width, height, format, 1, &mut buffer, 0) {
+                texture
             } else {
-                Err(Cow::Borrowed("we had no copy_context wtf"))
+                error!("gs_texture_create failed");
+                return;
             }
-        });
-        let result = result.and_then(|ctx| {
-            let buffer = ctx.image_buffer()
-                .map(Ok)
-                .unwrap_or(Err(Cow::Borrowed("image buffer didn't exist any more wtf")))?;
-            let mut buffer = buffer.as_ptr();
-            let obs_format: Option<obs::sys::gs_color_format> = format.into();
-            let obs_format = obs_format
-                .map(Ok)
-                .unwrap_or_else(|| Err(Cow::Owned(format!("format cannot be used with obs: {:?}", &format))))?;
-            let mut texture = unsafe {
-                obs::graphics::Texture::new(HEADSET_DIMENSIONS.0, HEADSET_DIMENSIONS.1, obs_format, 1, &mut buffer, 0)
-                    .unwrap()
-            };
-            obs::source::draw(&mut texture, 0, 0, 0, 0, false);
-            #[cfg(feature = "log-render-time")]
-            render_timer.log_checkpoint_ms("draw");
-            Ok(())
-        });
-        if let Err(e) = result {
-            error!("{}", e);
-        }
+        };
+        obs::source::draw(&mut texture, 0, 0, 0, 0, false);
         #[cfg(feature = "log-render-time")]
-        {
-            info!("video_render took {}ms", render_timer.elapsed_ms());
-        }
+        timer.log_checkpoint_ms("video_render");
     }
 }
 

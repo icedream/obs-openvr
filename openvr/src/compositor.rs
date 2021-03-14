@@ -63,6 +63,9 @@ impl Drop for MirrorTextureInfo {
     }
 }
 
+unsafe impl Send for MirrorTextureInfo {}
+unsafe impl Sync for MirrorTextureInfo {}
+
 pub unsafe fn get_mirror_texture_gl(eye: sys::EVREye) -> Result<MirrorTextureInfo, sys::EVRCompositorError> {
     let mut info = MirrorTextureInfo::empty();
     let e = obs_openvr_vrcompositor_getmirrortexturegl(eye, &mut info.id as *mut _, &mut info.handle as *mut _);
