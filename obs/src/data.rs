@@ -60,7 +60,7 @@ impl Data {
 impl Drop for Data {
     fn drop(&mut self) {
         Some(self.0).into_iter()
-            .filter(|p| p.is_null())
+            .filter(|p| !p.is_null())
             .for_each(|p| unsafe {
                 sys::obs_data_release(p);
             });
