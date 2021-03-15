@@ -63,15 +63,6 @@ unsafe impl Sync for CopyContext {}
 
 static INITIALIZE: Once = Once::new();
 
-fn init() {
-    INITIALIZE.call_once(|| {
-        unsafe {
-            trace!("initializing native tools");
-            obs_openvr_utils_init();
-        }
-    });
-}
-
 #[inline(always)]
 fn status_to_result(status: i32) -> Result<(), i32> {
     if status == 0 {
@@ -83,7 +74,6 @@ fn status_to_result(status: i32) -> Result<(), i32> {
 
 impl CopyContext {
     pub fn new(texture: u32) -> Option<Self> {
-        init();
         let ptr = unsafe { obs_openvr_copy_context_create(texture) };
         if ptr.is_null() {
             None
@@ -150,7 +140,6 @@ impl Into<Option<obs::sys::gs_color_format>> for TextureFormat {
 }
 
 extern "C" {
-    fn obs_openvr_utils_init();
     fn obs_openvr_copy_context_create(texture: u32) -> *mut CopyCtx;
     fn obs_openvr_copy_context_destroy(ctx: *mut CopyCtx);
     fn obs_openvr_copy_texture(ctx: *mut CopyCtx, width: u32, height: u32, format: u32) -> i32;

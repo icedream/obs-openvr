@@ -9,21 +9,6 @@ static GLFWglproc getProcAddressAndPrint(char *s) {
 	return ret;
 }
 
-void obs_openvr_utils_init() {
-	printf("obs_openvr: obs_openvr_utils_init\n");
-	fprintf(stderr, "obs_openvr: obs_openvr_utils_init\n");
-	debug_printf("obs_openvr: obs_openvr_utils_init\n");
-	debug_printf("obs_openvr: GL_NO_ERROR = %d\n", GL_NO_ERROR);
-	// glGenBuffers = (void (*)(GLsizei, GLuint*))getProcAddressAndPrint("glGenBuffers");
-	// glDeleteBuffers = (void (*)(GLsizei, GLuint*))getProcAddressAndPrint("glDeleteBuffers");
-	// glBindBuffer = (void (*)(GLenum, GLuint))getProcAddressAndPrint("glBindBuffer");
-	// glBindTexture = (void (*)(GLenum, GLuint))getProcAddressAndPrint("glBindTexture");
-	// glTexSubImage2D = (void (*)(GLuint, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void *))getProcAddressAndPrint("glTexSubImage2D");
-	// glMapBuffer = (void *(*)(GLenum, GLenum))getProcAddressAndPrint("glMapBuffer");
-	// glUnmapBuffer = (GLboolean (*)(GLenum))getProcAddressAndPrint("glUnmapBuffer");
-	// glBufferData = (void (*)(GLenum, GLsizeiptr, const void *, GLenum))getProcAddressAndPrint("glBufferData");
-}
-
 static void print_context_indented(struct obs_openvr_copy_context *ctx) {
 	if (ctx == NULL) {
 		return;
