@@ -9,18 +9,17 @@
 #define debug_printf(...)
 #endif // defined(DEBUG)
 
-void (*glGenBuffers)(GLsizei, GLuint*);
-void (*glDeleteBuffers)(GLsizei, GLuint*);
+// void (*glGenBuffers)(GLsizei, GLuint*);
+// void (*glDeleteBuffers)(GLsizei, GLuint*);
 // void (*glBindTexture)(GLenum, GLuint);
-void (*glBindBuffer)(GLenum, GLuint);
+// void (*glBindBuffer)(GLenum, GLuint);
 // void (*glTexSubImage2D)(GLuint, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void *);
-void *(*glMapBuffer)(GLenum, GLenum);
-GLboolean (*glUnmapBuffer)(GLenum);
-void (*glBufferData)(GLenum, GLsizeiptr size, const void *, GLenum);
+// void *(*glMapBuffer)(GLenum, GLenum);
+// GLboolean (*glUnmapBuffer)(GLenum);
+// void (*glBufferData)(GLenum, GLsizeiptr size, const void *, GLenum);
 
 struct obs_openvr_copy_context {
 	GLuint texture;
-	GLuint buffer;
 	size_t img_size;
 	uint8_t *img;
 };

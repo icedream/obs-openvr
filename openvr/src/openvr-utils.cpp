@@ -40,7 +40,6 @@ vr::EVRCompositorError obs_openvr_vrcompositor_getmirrortexturegl(vr::EVREye eye
 
 bool obs_openvr_vrcompositor_releasesharedgltexture(vr::glUInt_t id, vr::glSharedTextureHandle_t handle)
 {
-	std::cout << "obs_openvr: " << "releasing shared GL texture" << std::endl;
 	return vr::VRCompositor()->ReleaseSharedGLTexture(id, handle);
 }
 void obs_openvr_vrcompositor_locksharedgltexture(vr::glSharedTextureHandle_t handle)

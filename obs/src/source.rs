@@ -9,6 +9,9 @@ use std::{
     marker::PhantomData,
 };
 use crate::graphics as gs;
+use crate::{
+    Data,
+};
 
 pub struct RawSourceInfo<'a>(pub sys::obs_source_info, PhantomData<&'a ()>);
 
@@ -49,9 +52,9 @@ pub trait VideoSource: Sized {
     const ID: &'static [u8];
     const OUTPUT_FLAGS: Option<u32>;
 
-    fn create(settings: *mut sys::obs_data_t, source: *mut sys::obs_source_t) -> Self;
+    fn create(settings: &mut sys::obs_data, source: *mut sys::obs_source_t) -> Self;
     fn get_name() -> &'static CStr;
-    fn update(&self, _settings: *mut sys::obs_data_t) {
+    fn update(&self, settings: &sys::obs_data) {
         print_vs_stub("update");
     }
     fn get_properties(&self) -> *mut sys::obs_properties_t {
@@ -77,9 +80,7 @@ pub trait VideoSource: Sized {
     }
 
     fn raw_source_info() -> RawSourceInfo<'static> {
-        let id: &'static CStr = unsafe {
-            CStr::from_bytes_with_nul(Self::ID).unwrap()
-        };
+        let id: &'static CStr = CStr::from_bytes_with_nul(Self::ID).unwrap();
         let mut info = empty_source_info(id, sys::obs_source_type::OBS_SOURCE_TYPE_INPUT, Some(video_source_output_flags::<Self>()));
         info.0.get_name = Some(video_source_get_name::<Self>);
         info.0.get_width = Some(video_source_get_width::<Self>);
@@ -105,8 +106,19 @@ unsafe fn assert_as_ref<'a, T>(ptr: *mut libc::c_void) -> Option<&'a T> {
 }
 
 #[inline(always)]
+unsafe fn assert_as_mut<'a, T>(ptr: *mut libc::c_void) -> Option<&'a mut T> {
+    let data: *mut T = mem::transmute(ptr);
+    data.as_mut()
+}
+
+#[inline(always)]
 unsafe fn assert_ref<'a, T>(ptr: *mut libc::c_void) -> &'a T {
     assert_as_ref(ptr).unwrap()
+}
+
+#[inline(always)]
+unsafe fn assert_mut<'a, T>(ptr: *mut libc::c_void) -> &'a mut T {
+    assert_as_mut(ptr).unwrap()
 }
 
 unsafe extern "C" fn video_source_get_name<T: VideoSource + Sized>(_data: *mut libc::c_void) -> *const libc::c_char {
@@ -130,6 +142,7 @@ unsafe extern "C" fn video_source_get_properties<T: VideoSource>(data: *mut libc
 
 unsafe extern "C" fn video_source_update<T: VideoSource>(data: *mut libc::c_void, settings: *mut sys::obs_data_t) {
     let data: &T = assert_ref(data);
+    let settings = settings.as_mut().unwrap();
     data.update(settings);
 }
 
@@ -144,7 +157,7 @@ unsafe extern "C" fn video_source_video_tick<T: VideoSource>(data: *mut libc::c_
 }
 
 unsafe extern "C" fn video_source_create<S: VideoSource>(settings: *mut sys::obs_data_t, source: *mut sys::obs_source_t) -> *mut libc::c_void {
-    let source = Box::new(<S as VideoSource>::create(settings, source));
+    let source = Box::new(<S as VideoSource>::create(settings.as_mut().unwrap(), source));
     let ret: *mut S = Box::leak(source) as *mut S;
     mem::transmute(ret)
 }

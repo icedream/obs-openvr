@@ -21,6 +21,7 @@ use std::{
     ffi,
     fmt::Display,
     mem,
+    ops::Deref,
     sync::{
         atomic::AtomicBool,
         Arc,
@@ -45,44 +46,70 @@ use image::{
     ImageBuffer,
 };
 use capture::OpenVRCapture;
-
-pub(crate) const CRATE_NAME: &'static str = env!("CARGO_CRATE_NAME");
-
-macro_rules! debug_print {
-    ($args:tt) => {
-        print!("{}: ", crate::CRATE_NAME);
-        println!($args);
-    }
-}
+use obs::data::ObsData;
 
 static FILL_INFO: Once = Once::new();
 static mut SOURCE_INFO: Option<obs_sys::obs_source_info> = None;
 
 struct OpenVRMirrorSource {
     handle: *mut obs::sys::obs_source,
-    width: Option<u32>,
-    height: Option<u32>,
-    eye: openvr::sys::EVREye,
-    capture_context: OpenVRCapture,
+    capture_context: RwLock<OpenVRCapture>,
 }
 
 type ObsOpenVRImageBuffer = ImageBuffer<Rgba<u8>, Vec<u8>>;
 
 const DEFAULT_EYE: openvr::sys::EVREye = openvr::sys::EVREye::EVREye_Eye_Left;
 
+trait MirrorSourceSettings {
+    fn get_eye(&self) -> openvr::sys::EVREye;
+}
+
+impl MirrorSourceSettings for obs::sys::obs_data {
+    fn get_eye(&self) -> openvr::sys::EVREye {
+        use openvr::sys::EVREye::*;
+        use ffi::CStr;
+        let eye_key: &'static CStr = unsafe {
+            CStr::from_bytes_with_nul_unchecked(b"eye\0")
+        };
+        self.get_string(eye_key)
+            .and_then(|s| match s {
+                "left" => Some(EVREye_Eye_Left),
+                "right" => Some(EVREye_Eye_Right),
+                _ => None,
+            })
+            .unwrap_or(DEFAULT_EYE)
+    }
+}
+
 impl OpenVRMirrorSource {
-    pub fn new(handle: *mut obs::sys::obs_source) -> Self {
-        let eye = DEFAULT_EYE;
+    pub fn new(settings: &mut obs::sys::obs_data, handle: *mut obs::sys::obs_source) -> Self {
+        let eye = settings.get_eye();
         let capture_context = OpenVRCapture::new(eye, None)
             .expect("failed to create capture context");
         trace!("OpenVRMirrorSource::create()");
         OpenVRMirrorSource {
             handle: handle,
-            width: None,
-            height: None,
-            eye: eye,
-            capture_context: capture_context,
+            capture_context: RwLock::new(capture_context),
         }
+    }
+
+    fn capture_context<'a>(&'a self) -> impl Deref<Target=OpenVRCapture> + 'a {
+        self.capture_context.read().unwrap()
+    }
+
+    #[inline(always)]
+    pub fn eye(&self) -> openvr::sys::EVREye {
+        self.capture_context().eye()
+    }
+
+    pub fn set_eye(&self, eye: openvr::sys::EVREye) {
+        if eye == self.eye() {
+            return;
+        }
+        trace!("OpenVRMirrorSource: changing eye value {:?} -> {:?}", self.eye(), eye);
+        let mut capture_context = self.capture_context.write().unwrap();
+        *capture_context = OpenVRCapture::new(eye, None)
+            .expect("failed to create capture context");
     }
 
     #[inline(always)]
@@ -109,12 +136,10 @@ impl OpenVRMirrorSource {
     //     })
     // }
 
-
+    #[allow(dead_code)]
     pub fn dimensions(&self) -> (u32, u32) {
-        (self.width.unwrap_or(0), self.height.unwrap_or(0))
+        self.capture_context().dimensions()
     }
-
-    const DEFAULT_DIMENSIONS: (u32, u32) = (1920, 1080);
 }
 
 impl Drop for OpenVRMirrorSource {
@@ -123,15 +148,12 @@ impl Drop for OpenVRMirrorSource {
     }
 }
 
-const MAX_SIZE: libc::c_int = 100000;
-// const HEADSET_DIMENSIONS: (u32, u32) = (2468, 2740);
-
 impl obs::source::VideoSource for OpenVRMirrorSource {
     const ID: &'static [u8] = b"obs-openvr-mirror\0";
     const OUTPUT_FLAGS: Option<u32> = None;
 
-    fn create(settings: *mut obs::sys::obs_data, source: *mut obs::sys::obs_source_t) -> Self {
-        OpenVRMirrorSource::new(source)
+    fn create(settings: &mut obs::sys::obs_data, source: *mut obs::sys::obs_source_t) -> Self {
+        OpenVRMirrorSource::new(settings, source)
     }
 
     fn get_name() -> &'static ffi::CStr {
@@ -140,12 +162,12 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
 
     fn get_width(&self) -> u32 {
         // self.width.unwrap_or(Self::DEFAULT_DIMENSIONS.0)
-        self.capture_context.dimensions().0
+        self.dimensions().0
     }
 
     fn get_height(&self) -> u32 {
         // self.height.unwrap_or(Self::DEFAULT_DIMENSIONS.1)
-        self.capture_context.dimensions().1
+        self.dimensions().1
     }
 
     fn get_properties(&self) -> *mut obs::sys::obs_properties {
@@ -168,7 +190,18 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         }
     }
 
+    fn update(&self, data: &obs::sys::obs_data) {
+        trace!("OpenVRMirrorSource::update()");
+        use openvr::sys::EVREye::*;
+        use ffi::CStr;
+        let eye_key: &'static CStr = unsafe {
+            CStr::from_bytes_with_nul_unchecked(b"eye\0")
+        };
+        self.set_eye(data.get_eye());
+    }
+
     fn video_render(&self, effect: *mut obs::sys::gs_effect_t) {
+        let capture_context = self.capture_context.read().unwrap();
         #[cfg(feature = "log-render-time")]
         use timing::{
             Timer,
@@ -176,16 +209,16 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         };
         #[cfg(feature = "log-render-time")]
         let mut timer = Timer::new();
-        let (width, height) = self.capture_context.dimensions();
-        let copy_context = self.capture_context.copy_context();
-        let format = self.capture_context.obs_format().unwrap();
+        let (width, height) = capture_context.dimensions();
+        let copy_context = capture_context.copy_context();
+        let format = capture_context.obs_format().unwrap();
         let buffer = if let Some(buf) = copy_context.image_buffer() {
             buf
         } else {
             error!("image buffer doesn't exist");
             return;
         };
-        let dimensions = self.capture_context.dimensions();
+        let dimensions = capture_context.dimensions();
         let buffer: ImageBuffer<Rgba<u8>, _> = match ImageBuffer::from_raw(dimensions.0, dimensions.1, buffer) {
             Some(v) => v,
             None =>  {
@@ -206,20 +239,6 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         #[cfg(feature = "log-render-time")]
         timer.log_checkpoint_ms("video_render");
     }
-}
-
-pub(crate) fn init_glfw() -> Result<glfw::Glfw, io::Error> {
-    use io::ErrorKind;
-    use glfw::WindowHint;
-
-    trace!("initializing glfw");
-    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS)
-        .map_err(|e| io::Error::new(ErrorKind::Other, format!("Error initializing GLFW: {}", &e)))?;
-    trace!("glfw initialized");
-    #[cfg(not(feature = "show-context-window"))]
-    glfw.window_hint(WindowHint::Visible(false));
-    glfw.window_hint(WindowHint::ContextVersion(3, 2));
-    Ok(glfw)
 }
 
 fn obs_module_load_result() -> Result<(), impl Display + 'static> {

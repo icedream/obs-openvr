@@ -14,21 +14,21 @@ void obs_openvr_utils_init() {
 	fprintf(stderr, "obs_openvr: obs_openvr_utils_init\n");
 	debug_printf("obs_openvr: obs_openvr_utils_init\n");
 	debug_printf("obs_openvr: GL_NO_ERROR = %d\n", GL_NO_ERROR);
-	glGenBuffers = (void (*)(GLsizei, GLuint*))getProcAddressAndPrint("glGenBuffers");
-	glDeleteBuffers = (void (*)(GLsizei, GLuint*))getProcAddressAndPrint("glDeleteBuffers");
-	glBindBuffer = (void (*)(GLenum, GLuint))getProcAddressAndPrint("glBindBuffer");
+	// glGenBuffers = (void (*)(GLsizei, GLuint*))getProcAddressAndPrint("glGenBuffers");
+	// glDeleteBuffers = (void (*)(GLsizei, GLuint*))getProcAddressAndPrint("glDeleteBuffers");
+	// glBindBuffer = (void (*)(GLenum, GLuint))getProcAddressAndPrint("glBindBuffer");
 	// glBindTexture = (void (*)(GLenum, GLuint))getProcAddressAndPrint("glBindTexture");
 	// glTexSubImage2D = (void (*)(GLuint, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void *))getProcAddressAndPrint("glTexSubImage2D");
-	glMapBuffer = (void *(*)(GLenum, GLenum))getProcAddressAndPrint("glMapBuffer");
-	glUnmapBuffer = (GLboolean (*)(GLenum))getProcAddressAndPrint("glUnmapBuffer");
-	glBufferData = (void (*)(GLenum, GLsizeiptr, const void *, GLenum))getProcAddressAndPrint("glBufferData");
+	// glMapBuffer = (void *(*)(GLenum, GLenum))getProcAddressAndPrint("glMapBuffer");
+	// glUnmapBuffer = (GLboolean (*)(GLenum))getProcAddressAndPrint("glUnmapBuffer");
+	// glBufferData = (void (*)(GLenum, GLsizeiptr, const void *, GLenum))getProcAddressAndPrint("glBufferData");
 }
 
 static void print_context_indented(struct obs_openvr_copy_context *ctx) {
 	if (ctx == NULL) {
 		return;
 	}
-	debug_printf("\ttexture: %d\n\tbuffer: %d\n", ctx->texture, ctx->buffer);
+	debug_printf("\ttexture: %d\n", ctx->texture);
 }
 
 struct obs_openvr_copy_context *obs_openvr_copy_context_create(GLuint texture) {
@@ -38,12 +38,6 @@ struct obs_openvr_copy_context *obs_openvr_copy_context_create(GLuint texture) {
 	}
 	memset((void *)ctx, 0, sizeof(struct obs_openvr_copy_context));
 	ctx->texture = texture;
-	GLuint buffer;
-	glGenBuffers(1, &buffer);
-	if (buffer == 0) {
-		return NULL;
-	}
-	ctx->buffer = buffer;
 	debug_printf("copy_context_create():\n");
 	print_context_indented(ctx);
 	return ctx;
@@ -59,9 +53,6 @@ void obs_openvr_copy_context_destroy(struct obs_openvr_copy_context *ctx) {
 		free(ctx->img);
 		ctx->img = NULL;
 		ctx->img_size = 0;
-	}
-	if (ctx->buffer != 0) {
-		glDeleteBuffers(1, &ctx->buffer);
 	}
 	free(ctx);
 }

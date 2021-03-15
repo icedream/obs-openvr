@@ -16,7 +16,6 @@ pub struct TextureSize {
 #[derive(Debug, PartialEq, Eq)]
 pub struct CopyCtx {
     pub texture: u32,
-    pub buffer: u32,
     img_size: libc::size_t,
     img: *mut u8
 }

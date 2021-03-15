@@ -41,15 +41,33 @@ fn append_log_level<CrateName: ?Sized, Level: ?Sized>(crate_name: &CrateName, le
     env::set_var("RUST_LOG", &new_value);
 }
 
+fn list_has_crate<V: AsRef<str>, Crate: AsRef<str>>(v: V, crate_name: Crate) -> bool {
+    let prefix = format!("{}=", crate_name.as_ref());
+    let v = v.as_ref();
+    v.split(",")
+        .find(|s| s.starts_with(&prefix))
+        .is_some()
+}
+
+#[inline]
+fn has_crate<S: AsRef<str>>(crate_name: S) -> bool {
+    env::var("RUST_LOG")
+        .ok()
+        .map(|v| list_has_crate(v, crate_name))
+        .unwrap_or(false)
+}
+
 pub fn init() {
     INIT_LOGGING.call_once(|| {
         let level = env_or_default("OBS_OPENVR_LOG", DEFAULT_LOG_LEVEL.as_ref());
         let level = level.to_str().unwrap();
-        append_log_level(env!("CARGO_CRATE_NAME"), level);
-        if level == "trace" || level == "debug" {
-            DEBUG_CRATES.iter().for_each(|debug_crate| {
-                append_log_level(debug_crate, level);
-            });
+        if !has_crate(env!("CARGO_CRATE_NAME")) {
+            append_log_level(env!("CARGO_CRATE_NAME"), level);
+            if level == "trace" || level == "debug" {
+                DEBUG_CRATES.iter().for_each(|debug_crate| {
+                    append_log_level(debug_crate, level);
+                });
+            }
         }
         env::var_os("RUST_LOG").into_iter().for_each(|v| {
             println!("obs_openvr: RUST_LOG={:?}", &v);

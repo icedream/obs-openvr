@@ -56,6 +56,7 @@ impl Drop for MirrorTextureInfo {
             return;
         }
         unsafe {
+            trace!("releasing shared gl texture: {:?}", self);
             util::obs_openvr_vrcompositor_releasesharedgltexture(self.id, self.handle);
         }
         self.id = 0;
