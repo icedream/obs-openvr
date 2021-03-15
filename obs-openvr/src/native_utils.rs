@@ -1,4 +1,5 @@
 use std::{
+    io,
     mem,
     ops::Deref,
     slice,
@@ -121,6 +122,17 @@ impl TextureFormat {
 #[no_mangle]
 extern "C" fn obs_openvr_bytes_per_pixel(format: TextureFormat) -> u8 {
     format.bytes_per_pixel()
+}
+
+#[no_mangle]
+unsafe extern "C" fn obs_openvr_copy_context_print(ctx: *const CopyCtx) {
+    use io::Write;
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    let _ = match ctx.as_ref() {
+        Some(ctx) => write!(&mut stdout, "{:?}", ctx),
+        None => write!(&mut stdout, "None"),
+    };
 }
 
 impl Into<u32> for TextureFormat {

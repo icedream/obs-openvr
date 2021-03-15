@@ -8,6 +8,7 @@ use std::{
     },
     ptr,
 };
+use crate::OwnedPointerContainer;
 
 pub struct StringPropertyList<'a>(&'a mut sys::obs_property);
 
@@ -17,19 +18,19 @@ impl<'a> StringPropertyList<'a> {
     }
 
     #[inline(always)]
-    fn as_mut_ptr(&mut self) -> *mut sys::obs_property {
-        self.0 as *mut _
+    fn as_ptr_mut(&mut self) -> *mut sys::obs_property {
+        self.0 as _
     }
 
     pub fn add_int(&mut self, name: &'static CStr, value: libc::c_longlong) -> u64 {
         unsafe {
-            sys::obs_property_list_add_int(self.as_mut_ptr(), name.as_ptr(), value)
+            sys::obs_property_list_add_int(self.as_ptr_mut(), name.as_ptr(), value)
         }
     }
 
     pub fn add_string(&mut self, name: &'static CStr, value: &'static CStr) -> u64 {
         unsafe {
-            sys::obs_property_list_add_string(self.as_mut_ptr(), name.as_ptr(), value.as_ptr())
+            sys::obs_property_list_add_string(self.as_ptr_mut(), name.as_ptr(), value.as_ptr())
         }
     }
 }
@@ -70,16 +71,6 @@ impl Properties {
         Properties(ptr)
     }
 
-    #[inline(always)]
-    fn as_ptr(&self) -> *const sys::obs_properties {
-        self.0 as _
-    }
-
-    #[inline(always)]
-    fn as_ptr_mut(&mut self) -> *mut sys::obs_properties {
-        self.0
-    }
-
     pub fn add_bool(&mut self, name: &'static CStr, description: &'static CStr) -> &mut sys::obs_property {
         unsafe {
             sys::obs_properties_add_bool(self.as_ptr_mut(), name.as_ptr(), description.as_ptr()).as_mut().unwrap()
@@ -108,6 +99,18 @@ impl Properties {
         let ret = self.0;
         self.0 = ptr::null_mut();
         ret
+    }
+}
+
+impl OwnedPointerContainer<sys::obs_properties> for Properties {
+    #[inline(always)]
+    fn as_ptr(&self) -> *const sys::obs_properties {
+        self.0 as _
+    }
+
+    #[inline(always)]
+    fn as_ptr_mut(&mut self) -> *mut sys::obs_properties {
+        self.0
     }
 }
 

@@ -3,17 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 
-static GLFWglproc getProcAddressAndPrint(char *s) {
-	GLFWglproc ret = glfwGetProcAddress(s);
-	debug_printf("%s() = %p\n", s, ret);
-	return ret;
-}
-
-static void print_context_indented(struct obs_openvr_copy_context *ctx) {
-	if (ctx == NULL) {
-		return;
-	}
-	debug_printf("\ttexture: %d\n", ctx->texture);
+static inline void debug_context_print(const struct obs_openvr_copy_context *ctx) {
+#ifdef DEBUG
+	obs_openvr_copy_context_print(ctx);
+#else
+	return;
+#endif // defined(DEBUG)
 }
 
 struct obs_openvr_copy_context *obs_openvr_copy_context_create(GLuint texture) {
@@ -23,17 +18,18 @@ struct obs_openvr_copy_context *obs_openvr_copy_context_create(GLuint texture) {
 	}
 	memset((void *)ctx, 0, sizeof(struct obs_openvr_copy_context));
 	ctx->texture = texture;
-	debug_printf("copy_context_create():\n");
-	print_context_indented(ctx);
+	debug_printf("copy_context_create(): ");
+	debug_context_print(ctx);
+	debug_printf("\n");
 	return ctx;
 }
 
 void obs_openvr_copy_context_destroy(struct obs_openvr_copy_context *ctx) {
-	debug_printf("copy_context_destroy():\n");
+	debug_printf("copy_context_destroy(%p):\n", ctx);
 	if (ctx == NULL) {
 		return;
 	}
-	print_context_indented(ctx);
+	debug_context_print(ctx);
 	if (ctx->img != NULL) {
 		free(ctx->img);
 		ctx->img = NULL;

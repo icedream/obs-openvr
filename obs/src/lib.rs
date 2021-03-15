@@ -6,6 +6,7 @@ pub mod properties;
 pub mod graphics;
 pub mod source;
 pub mod data;
+pub(crate) mod ptr;
 
 pub use data::Data;
 

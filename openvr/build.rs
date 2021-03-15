@@ -3,11 +3,7 @@ extern crate pkg_config;
 
 use std::{
     collections::LinkedList,
-    env,
     iter,
-    path::{
-        PathBuf,
-    },
 };
 
 struct DependencyConfig {
@@ -25,10 +21,6 @@ impl DependencyConfig {
         Ok(DependencyConfig {
             cflags: cflags,
         })
-    }
-
-    pub fn cflags(&self) -> String {
-        self.cflags.iter().fold(String::from(""), |all_flags, s| format!("{} {}", all_flags, s))
     }
 }
 

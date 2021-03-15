@@ -11,7 +11,7 @@ mod logging;
 pub mod module;
 pub(crate) mod native_utils;
 mod timing;
-mod capture;
+pub mod capture;
 
 pub use openvr::sys as openvr_sys;
 
@@ -136,7 +136,6 @@ impl OpenVRMirrorSource {
     //     })
     // }
 
-    #[allow(dead_code)]
     pub fn dimensions(&self) -> (u32, u32) {
         self.capture_context().dimensions()
     }
@@ -160,14 +159,8 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"OpenVR Mirror Source\0") }
     }
 
-    fn get_width(&self) -> u32 {
-        // self.width.unwrap_or(Self::DEFAULT_DIMENSIONS.0)
-        self.dimensions().0
-    }
-
-    fn get_height(&self) -> u32 {
-        // self.height.unwrap_or(Self::DEFAULT_DIMENSIONS.1)
-        self.dimensions().1
+    fn get_dimensions(&self) -> (u32, u32) {
+        self.dimensions()
     }
 
     fn get_properties(&self) -> *mut obs::sys::obs_properties {

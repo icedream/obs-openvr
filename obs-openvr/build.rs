@@ -42,6 +42,7 @@ impl BuildProfile {
         self == BuildProfile::Debug
     }
 
+    #[allow(dead_code)]
     pub fn as_str(self) -> &'static str {
         use BuildProfile::*;
         match self {

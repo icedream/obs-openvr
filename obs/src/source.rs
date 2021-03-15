@@ -2,16 +2,11 @@ use obs_sys as sys;
 
 use std::{
     mem,
-    ffi::{
-        self,
-        CStr,
-    },
+    ffi::CStr,
     marker::PhantomData,
 };
 use crate::graphics as gs;
-use crate::{
-    Data,
-};
+use crate::ptr::*;
 
 pub struct RawSourceInfo<'a>(pub sys::obs_source_info, PhantomData<&'a ()>);
 
@@ -54,7 +49,7 @@ pub trait VideoSource: Sized {
 
     fn create(settings: &mut sys::obs_data, source: *mut sys::obs_source_t) -> Self;
     fn get_name() -> &'static CStr;
-    fn update(&self, settings: &sys::obs_data) {
+    fn update(&self, _settings: &sys::obs_data) {
         print_vs_stub("update");
     }
     fn get_properties(&self) -> *mut sys::obs_properties_t {
@@ -63,16 +58,12 @@ pub trait VideoSource: Sized {
             sys::obs_properties_create()
         }
     }
-    fn get_width(&self) -> u32 {
-        print_vs_stub("get_width");
-        0
-    }
-    fn get_height(&self) -> u32 {
-        print_vs_stub("get_height");
-        0
+    fn get_dimensions(&self) -> (u32, u32) {
+        print_vs_stub("get_dimensions");
+        (0, 0)
     }
 
-    fn video_render(&self, effect: *mut sys::gs_effect_t) {
+    fn video_render(&self, _effect: *mut sys::gs_effect_t) {
         print_vs_stub("video_render");
     }
     fn video_tick(&self, _seconds: f32) {
@@ -95,30 +86,25 @@ pub trait VideoSource: Sized {
     }
 }
 
+trait VideoSourceExt {
+    fn get_width(&self) -> u32;
+    fn get_height(&self) -> u32;
+}
+
+impl<T> VideoSourceExt for T where
+    T: VideoSource,
+{
+    fn get_width(&self) -> u32 {
+        self.get_dimensions().0
+    }
+
+    fn get_height(&self) -> u32 {
+        self.get_dimensions().1
+    }
+}
+
 fn video_source_output_flags<S: VideoSource>() -> u32 {
     <S as VideoSource>::OUTPUT_FLAGS.unwrap_or(0) | sys::OBS_SOURCE_VIDEO
-}
-
-#[inline(always)]
-unsafe fn assert_as_ref<'a, T>(ptr: *mut libc::c_void) -> Option<&'a T> {
-    let data: *const T = mem::transmute(ptr);
-    data.as_ref()
-}
-
-#[inline(always)]
-unsafe fn assert_as_mut<'a, T>(ptr: *mut libc::c_void) -> Option<&'a mut T> {
-    let data: *mut T = mem::transmute(ptr);
-    data.as_mut()
-}
-
-#[inline(always)]
-unsafe fn assert_ref<'a, T>(ptr: *mut libc::c_void) -> &'a T {
-    assert_as_ref(ptr).unwrap()
-}
-
-#[inline(always)]
-unsafe fn assert_mut<'a, T>(ptr: *mut libc::c_void) -> &'a mut T {
-    assert_as_mut(ptr).unwrap()
 }
 
 unsafe extern "C" fn video_source_get_name<T: VideoSource + Sized>(_data: *mut libc::c_void) -> *const libc::c_char {

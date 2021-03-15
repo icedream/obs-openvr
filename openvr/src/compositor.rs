@@ -1,7 +1,6 @@
 use openvr_sys as sys;
 use crate::util;
 use crate::error_ext::{
-    ErrorType,
     ErrorTypeExt,
 };
 
@@ -52,7 +51,7 @@ impl MirrorTextureInfo {
 
 impl Drop for MirrorTextureInfo {
     fn drop(&mut self) {
-        if (self.id <= 0 || self.handle.is_null()) {
+        if self.id <= 0 || self.handle.is_null() {
             return;
         }
         unsafe {
