@@ -3,7 +3,6 @@ use std::{
     mem,
     ops::Deref,
     slice,
-    sync::Once,
 };
 
 #[repr(C)]
@@ -61,8 +60,6 @@ impl Deref for CopyContext {
 
 unsafe impl Send for CopyContext {}
 unsafe impl Sync for CopyContext {}
-
-static INITIALIZE: Once = Once::new();
 
 #[inline(always)]
 fn status_to_result(status: i32) -> Result<(), i32> {

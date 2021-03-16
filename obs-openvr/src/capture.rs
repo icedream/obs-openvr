@@ -35,7 +35,6 @@ use crate::{
 };
 
 fn init_glfw() -> Result<glfw::Glfw, io::Error> {
-    use io::ErrorKind;
     use glfw::WindowHint;
 
     trace!("initializing glfw");
@@ -49,9 +48,9 @@ fn init_glfw() -> Result<glfw::Glfw, io::Error> {
 }
 
 struct GlfwContext {
-    glfw: glfw::Glfw,
+    _glfw: glfw::Glfw,
     window: glfw::Window,
-    events: Receiver<(f64, glfw::WindowEvent)>,
+    _events: Receiver<(f64, glfw::WindowEvent)>,
 }
 
 impl GlfwContext {
@@ -62,9 +61,9 @@ impl GlfwContext {
             .unwrap_or_else(|| Err(io::Error::new(ErrorKind::Other, "Failed to create GLFW offscreen window")))?;
         window.set_close_polling(true);
         Ok(GlfwContext {
-            glfw: glfw,
+            _glfw: glfw,
             window: window,
-            events: events,
+            _events: events,
         })
     }
 
@@ -129,10 +128,9 @@ impl<T> Drop for JoinOnDrop<T> {
 pub struct OpenVRCapture {
     dimensions: (u32, u32),
     eye: openvr::sys::EVREye,
-    texture_info: Arc<RwLock<MirrorTextureInfo>>,
-    interval: Option<Duration>,
+    _texture_info: Arc<RwLock<MirrorTextureInfo>>,
     running: Arc<AtomicBool>,
-    copy_thread: Option<JoinOnDrop<()>>,
+    _copy_thread: Option<JoinOnDrop<()>>,
     copy_context: Arc<RwLock<CopyContext>>,
     format: TextureFormat,
 }
@@ -168,8 +166,6 @@ impl OpenVRCapture {
             let copy_context = copy_context.clone();
             thread::spawn(move || {
                 let mut last_error_log: Option<Instant> = None;
-                let obs_format: Option<obs::sys::gs_color_format> = format.into();
-                let obs_format = obs_format.unwrap();
 
                 let do_loop = || -> Result<(), Cow<'static, str>> {
                     obs::graphics::isolate_context(|| {
@@ -202,10 +198,9 @@ impl OpenVRCapture {
         Ok(OpenVRCapture {
             dimensions: (texture_size.width, texture_size.height),
             eye: eye,
-            texture_info: texture_info,
-            interval: interval,
+            _texture_info: texture_info,
             running: running,
-            copy_thread: Some(JoinOnDrop::from(copy_thread)),
+            _copy_thread: Some(JoinOnDrop::from(copy_thread)),
             copy_context: copy_context,
             format: format,
         })
