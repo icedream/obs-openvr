@@ -2,6 +2,10 @@
 
 OpenVR capture plugin for [`obs-studio`](https://github.com/obsproject/obs-studio) on Linux. Similar to [OBS-OpenVR-Input-Plugin](https://github.com/baffler/OBS-OpenVR-Input-Plugin) on Windows.
 
+# Usage
+
+Note that initially, you'll see the *whole* texture being sent by OpenVR, including the black space around the eye viewport, and some uselessly distorted stuff on the edge. What you likely want to do is add a `Crop/Pad` filter in `OBS` to crop the image down to the aspect ratio/size that you actually desire.
+
 # Building & Installation
 
 ## Packages
