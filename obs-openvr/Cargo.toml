@@ -25,6 +25,9 @@ path = "../openvr"
 [build-dependencies]
 pkg-config = "0.3"
 
+[build-dependencies.build-profile]
+path = "../build-profile"
+
 [build-dependencies.cc]
 version = "^1.0.67"
 features = ["parallel"]
