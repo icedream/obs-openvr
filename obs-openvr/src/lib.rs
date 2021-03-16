@@ -48,9 +48,6 @@ use image::{
 use capture::OpenVRCapture;
 use obs::data::ObsData;
 
-static FILL_INFO: Once = Once::new();
-static mut SOURCE_INFO: Option<obs_sys::obs_source_info> = None;
-
 struct OpenVRMirrorSource {
     handle: *mut obs::sys::obs_source,
     capture_context: RwLock<OpenVRCapture>,
@@ -253,16 +250,7 @@ fn obs_module_load_result() -> Result<(), impl Display + 'static> {
     // Initialize glfw off-screen
 
     // Create source info struct, and register it
-    FILL_INFO.call_once(|| {
-        use obs::source::VideoSource;
-        unsafe {
-            SOURCE_INFO = Some(<OpenVRMirrorSource as VideoSource>::raw_source_info().unwrap());
-
-        }
-    });
-    unsafe {
-        obs::register_source(SOURCE_INFO.as_ref().unwrap(), None);
-    }
+    obs::register_video_source!(OpenVRMirrorSource);
 
     trace!("loaded");
     Ok(())
