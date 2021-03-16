@@ -137,3 +137,19 @@ impl DerefMut for Properties {
         unsafe { self.0.as_mut().unwrap() }
     }
 }
+
+pub trait PropertiesExt {
+    fn add_string_list_complete<'a, It>(&'a mut self, header: PropertyDescription<'static>, it: It) where
+        It: Iterator<Item=(&'static CStr, &'static CStr)>;
+}
+
+impl PropertiesExt for Properties {
+    fn add_string_list_complete<'a, It>(&'a mut self, header: PropertyDescription<'static>, it: It) where
+        It: Iterator<Item=(&'static CStr, &'static CStr)>,
+    {
+        let mut prop = self.add_string_list(header, false);
+        it.for_each(|(k, v)| {
+            prop.add_string(k, v);
+        });
+    }
+}

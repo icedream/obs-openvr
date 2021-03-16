@@ -164,21 +164,21 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
     }
 
     fn get_properties(&self) -> *mut obs::sys::obs_properties {
-        use obs::properties::PropertyDescription;
+        use obs::properties::{
+            Properties,
+            PropertiesExt,
+            PropertyDescription,
+        };
         unsafe {
             use obs::sys as sys;
             use ffi::CStr;
 
-            let mut props = obs::properties::Properties::new();
+            let mut props = Properties::new();
 
             let eye_name: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"eye\0");
             let left_eye: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"left\0");
             let right_eye: &'static CStr = CStr::from_bytes_with_nul_unchecked(b"right\0");
-            {
-                let mut eye_list = props.add_string_list(PropertyDescription::new(eye_name, None), false);
-                eye_list.add_string(left_eye, left_eye);
-                eye_list.add_string(right_eye, right_eye);
-            }
+            props.add_string_list_complete(PropertyDescription::new(eye_name, None), [(left_eye, left_eye), (right_eye, right_eye)].iter().map(|&v| v));
             props.leak()
         }
     }
