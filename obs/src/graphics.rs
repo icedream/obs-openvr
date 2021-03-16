@@ -2,7 +2,10 @@ use obs_sys as sys;
 
 use std::{
     marker::PhantomData,
-    ops::Deref,
+    ops::{
+        Deref,
+        DerefMut,
+    },
     ptr,
 };
 
@@ -108,6 +111,15 @@ impl<'a> Deref for Texture<'a> {
     fn deref(&self) -> &Self::Target {
         unsafe {
             self.0.as_ref().unwrap()
+        }
+    }
+}
+
+impl<'a> DerefMut for Texture<'a> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut <Self as Deref>::Target {
+        unsafe {
+            self.0.as_mut().unwrap()
         }
     }
 }
