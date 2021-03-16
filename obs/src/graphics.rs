@@ -2,6 +2,7 @@ use obs_sys as sys;
 
 use std::{
     marker::PhantomData,
+    ops::Deref,
     ptr,
 };
 
@@ -41,6 +42,36 @@ pub fn with_graphics<Ret, F: FnOnce() -> Ret>(f: F) -> Ret {
     ret
 }
 
+pub trait GsTexture {
+    fn get_width(&self) -> u32;
+    fn get_height(&self) -> u32;
+    fn get_color_format(&self) -> sys::gs_color_format;
+
+    fn get_dimensions(&self) -> (u32, u32) {
+        (self.get_width(), self.get_height())
+    }
+}
+
+impl GsTexture for sys::gs_texture_t {
+    fn get_width(&self) -> u32 {
+        unsafe {
+            sys::gs_texture_get_width(self as *const _)
+        }
+    }
+
+    fn get_height(&self) -> u32 {
+        unsafe {
+            sys::gs_texture_get_height(self as *const _)
+        }
+    }
+
+    fn get_color_format(&self) -> sys::gs_color_format {
+        unsafe {
+            sys::gs_texture_get_color_format(self as *const _)
+        }
+    }
+}
+
 pub struct Texture<'a>(*mut sys::gs_texture_t, PhantomData<&'a [u8]>);
 
 impl<'a> Texture<'a> {
@@ -67,6 +98,17 @@ impl<'a> Texture<'a> {
         let ret = self.0;
         self.0 = ptr::null_mut();
         ret
+    }
+}
+
+impl<'a> Deref for Texture<'a> {
+    type Target = sys::gs_texture_t;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            self.0.as_ref().unwrap()
+        }
     }
 }
 
