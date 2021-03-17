@@ -83,6 +83,12 @@ impl Properties {
         }
     }
 
+    pub fn add_text(&mut self, name: &'static CStr, description: &'static CStr, ty: sys::obs_text_type) -> &mut sys::obs_property {
+        unsafe {
+            sys::obs_properties_add_text(self.as_ptr_mut(), name.as_ptr(), description.as_ptr(), ty).as_mut().unwrap()
+        }
+    }
+
     pub fn add_string_list<'a>(&'a mut self, header: PropertyDescription<'static>, editable: bool) -> StringPropertyList<'a> {
         let combo_type = if editable {
             sys::obs_combo_type::OBS_COMBO_TYPE_EDITABLE

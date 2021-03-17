@@ -22,6 +22,13 @@ impl ErrorType for sys::EVRCompositorError {
     }
 }
 
+impl ErrorType for sys::EVROverlayError {
+    #[inline(always)]
+    fn non_error() -> Self {
+        sys::EVROverlayError::EVROverlayError_VROverlayError_None
+    }
+}
+
 pub trait ErrorTypeExt: Sized {
     fn into_result(self) -> Result<Self, Self>;
 

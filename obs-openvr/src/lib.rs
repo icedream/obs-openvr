@@ -12,6 +12,7 @@ pub mod module;
 pub(crate) mod native_utils;
 mod timing;
 pub mod capture;
+pub mod overlay;
 
 pub use openvr::sys as openvr_sys;
 
@@ -197,6 +198,7 @@ fn obs_module_load_result() -> Result<(), impl Display + 'static> {
 
     // Create source info struct, and register it
     obs::register_video_source!(OpenVRMirrorSource);
+    obs::register_video_source!(overlay::OpenVROverlaySource);
 
     trace!("loaded");
     Ok(())
@@ -205,7 +207,25 @@ fn obs_module_load_result() -> Result<(), impl Display + 'static> {
 #[no_mangle]
 pub extern "C" fn obs_module_load() -> bool {
     match obs_module_load_result() {
-        Ok(_) => true,
+        Ok(_) => {
+            // use ffi::CStr;
+            // use image::{ ImageBuffer, Bgra, buffer::ConvertBuffer };
+            // let overlay_key = unsafe { CStr::from_bytes_with_nul_unchecked(b"StereoLayer:2\0") };
+            // let overlay_image = openvr::overlay::OverlayImageData::find_overlay(overlay_key);
+            // match overlay_image {
+            //     Ok(data) => {
+            //         info!("got overlay image with data length: {}", data.data().len());
+            //         let image_buffer: ImageBuffer<Bgra<u8>, _> = ImageBuffer::from_raw(1920, 1080, data.data()).unwrap();
+            //         let image_buffer: ImageBuffer<Rgba<u8>, _> = image_buffer.convert();
+            //         if let Err(e) = image_buffer.save("/home/mcoffin/obs-openvr-overlay.png") {
+            //             error!("Error saving overly image: {:?}", &e);
+            //         }
+            //     },
+            //     Err(e) => error!("error getting overlay image: {:?}", &e),
+            // }
+            // info!("overlay \"{}\": {:?}", overlay_key.to_str().unwrap(), openvr::overlay::find_overlay(overlay_key));
+            true
+        },
         Err(e) => {
             use io::Write;
             let stderr = io::stderr();
