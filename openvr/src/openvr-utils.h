@@ -15,6 +15,7 @@ namespace openvr_utils {
 		size_t required_size();
 		vr::EVROverlayError fill_with(vr::VROverlayHandle_t handle);
 		void *data();
+		size_t data_size();
 		uint32_t m_width;
 		uint32_t m_height;
 	private:
@@ -49,4 +50,5 @@ extern "C" {
 	void openvr_utils_overlay_image_data_destroy(openvr_utils::OverlayImageData *data);
 	openvr_utils_buffer_data openvr_utils_overlay_image_data_get_data(openvr_utils::OverlayImageData *data);
 	openvr_utils_dimensions openvr_utils_overlay_image_data_get_dimensions(openvr_utils::OverlayImageData *data);
+	vr::EVROverlayError openvr_utils_overlay_image_data_refill(openvr_utils::OverlayImageData *data, vr::VROverlayHandle_t handle);
 }

@@ -11,6 +11,7 @@ pub struct OpenVROverlaySource {
     _source_handle: *mut obs::sys::obs_source_t,
     key: RwLock<Option<CString>>,
     dimensions: RwLock<Option<(u32, u32)>>,
+    image_data: RwLock<Option<openvr::overlay::OverlayImageData>>,
 }
 
 impl OpenVROverlaySource {
@@ -19,6 +20,7 @@ impl OpenVROverlaySource {
             _source_handle: source,
             key: RwLock::new(None),
             dimensions: RwLock::new(None),
+            image_data: RwLock::new(None),
         }
     }
 }
@@ -51,13 +53,27 @@ impl obs::source::VideoSource for OpenVROverlaySource {
     fn video_render(&self, _effect: *mut obs::sys::gs_effect_t) {
         let key = self.key.read().unwrap();
         if let Some(key) = key.as_ref() {
-            let overlay_image = openvr::overlay::OverlayImageData::find_overlay(key);
-            let overlay_image = match overlay_image {
-                Ok(v) => v,
-                Err(e) => {
-                    error!("error getting overlay image: {:?}", &e);
-                    return;
-                },
+            let mut image_data = self.image_data.write().unwrap();
+            if let Some(image_data) = image_data.as_mut() {
+                let handle = openvr::overlay::find_overlay(key).ok();
+                if let Some(handle) = handle {
+                    if let Err(e) = image_data.refill(handle) {
+                        error!("error refilling overlay image: {:?}", &e);
+                    }
+                }
+            } else {
+                *image_data = match openvr::overlay::OverlayImageData::find_overlay(key) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        error!("error getting overlay image: {:?}", &e);
+                        return;
+                    },
+                };
+            }
+            let overlay_image = if let Some(v) = image_data.as_ref() {
+                v
+            } else {
+                return;
             };
             let image_size = overlay_image.dimensions();
             {

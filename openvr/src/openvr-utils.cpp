@@ -87,17 +87,26 @@ vr::EVROverlayError openvr_utils::OverlayImageData::fill_with(vr::VROverlayHandl
 {
 	auto vroverlay = vr::VROverlay();
 	vr::EVROverlayError status = vroverlay->GetOverlayImageData(handle, nullptr, 0, &m_width, &m_height);
-	std::cerr << "OverlayImageData::fill_with: (" << m_width << ", " << m_height << ')' << std::endl;
+	// std::cerr << "OverlayImageData::fill_with: (" << m_width << ", " << m_height << ')' << std::endl;
 	if (status != vr::VROverlayError_None && status != vr::VROverlayError_ArrayTooSmall) {
 		return status;
 	}
-	std::vector<uint8_t> data(required_size(), 0);
-	status = vroverlay->GetOverlayImageData(handle, static_cast<void*>(data.data()), data.size(), &m_width, &m_height);
-	m_data = std::move(data);
+	if (m_data.size() != required_size()) {
+		// std::cerr << "OverlayImageData::fill_with: reallocating" << std::endl;
+		std::vector<uint8_t> data(required_size(), 0);
+		status = vroverlay->GetOverlayImageData(handle, static_cast<void*>(data.data()), data.size(), &m_width, &m_height);
+		m_data = std::move(data);
+	} else {
+		status = vroverlay->GetOverlayImageData(handle, static_cast<void*>(m_data.data()), m_data.size(), &m_width, &m_height);
+	}
 	return status;
 }
 void *openvr_utils::OverlayImageData::data() {
 	return static_cast<void*>(m_data.data());
+}
+
+size_t openvr_utils::OverlayImageData::data_size() {
+	return m_data.size();
 }
 
 vr::EVROverlayError openvr_utils_get_overlay_image_data(vr::VROverlayHandle_t handle, openvr_utils::OverlayImageData **data)
@@ -119,7 +128,7 @@ void openvr_utils_overlay_image_data_destroy(openvr_utils::OverlayImageData *dat
 openvr_utils_buffer_data openvr_utils_overlay_image_data_get_data(openvr_utils::OverlayImageData *data)
 {
 	struct openvr_utils_buffer_data buf = {
-		.size = data->required_size(),
+		.size = data->data_size(),
 		.data = static_cast<uint8_t*>(data->data()),
 	};
 	return buf;
@@ -131,4 +140,8 @@ openvr_utils_dimensions openvr_utils_overlay_image_data_get_dimensions(openvr_ut
 		.height = data->m_height,
 	};
 	return ret;
+}
+vr::EVROverlayError openvr_utils_overlay_image_data_refill(openvr_utils::OverlayImageData *data, vr::VROverlayHandle_t handle)
+{
+	return data->fill_with(handle);
 }

@@ -65,6 +65,12 @@ impl OverlayImageData {
         };
         (size.width, size.height)
     }
+
+    pub fn refill(&mut self, handle: sys::VROverlayHandle_t) -> Result<(), sys::EVROverlayError> {
+        unsafe {
+            openvr_utils_overlay_image_data_refill(self.0, handle).into_empty_result()
+        }
+    }
 }
 
 impl Drop for OverlayImageData {
@@ -83,4 +89,5 @@ extern "C" {
     fn openvr_utils_overlay_image_data_destroy(data: *mut libc::c_void);
     fn openvr_utils_overlay_image_data_get_data(data: *mut libc::c_void) -> BufferData;
     fn openvr_utils_overlay_image_data_get_dimensions(data: *mut libc::c_void) -> Dimensions;
+    fn openvr_utils_overlay_image_data_refill(data: *mut libc::c_void, handle: sys::VROverlayHandle_t) -> sys::EVROverlayError;
 }
