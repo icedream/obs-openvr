@@ -17,7 +17,7 @@ If you're on [Arch Linux](https://archlinux.org) or one of it's family of distri
 `obs-openvr` is built with [`cargo`](https://crates.io), and requires the following dependent libraries.
 
 * `libobs`
-* `glfw`
+* `glfw` (only if building with the `mirror-source` feature, which is included by default)
 * `openvr`
 
 To build, as with any `cargo` crate, just do the following.
