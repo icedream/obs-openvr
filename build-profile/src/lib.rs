@@ -67,3 +67,8 @@ impl FromStr for BuildProfile {
         }
     }
 }
+
+pub fn has_feature<S: AsRef<str>>(feature: S) -> bool {
+    let feature = feature.as_ref().to_uppercase().replace("-", "_");
+    env::var_os(format!("CARGO_FEATURE_{}", &feature)).is_some()
+}

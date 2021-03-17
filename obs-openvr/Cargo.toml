@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "*"
-glfw = "0.41"
+glfw = { version = "0.41", optional = true }
 image = "0.23"
 log = "0.4"
 env_logger = "0.8"
@@ -33,6 +33,9 @@ version = "^1.0.67"
 features = ["parallel"]
 
 [features]
+default = ["mirror-source", "overlay-source"]
+mirror-source = ["glfw"]
+overlay-source = []
 log-render-time = []
 no-lock = ["openvr/no-lock"]
 save-image = []
