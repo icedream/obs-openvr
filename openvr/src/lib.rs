@@ -7,6 +7,7 @@ pub mod error_ext;
 pub mod util;
 pub mod compositor;
 pub mod headset_view;
+pub mod overlay;
 
 use error_ext::{
     ErrorType,
