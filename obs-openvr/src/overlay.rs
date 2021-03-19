@@ -5,7 +5,10 @@ use std::{
     },
     mem,
     ops::Deref,
-    time::Duration,
+    time::{
+        Duration,
+        Instant,
+    },
     sync::{
         Arc,
         RwLock,
@@ -74,6 +77,7 @@ pub struct OpenVROverlaySource {
     image_data: Arc<ImageDataBuffers>,
     _copy_thread: JoinOnDrop<()>,
     running: Arc<AtomicBool>,
+    interval: Arc<Option<Duration>>,
 }
 
 impl OpenVROverlaySource {
@@ -81,19 +85,29 @@ impl OpenVROverlaySource {
         let image_data = Arc::new(ImageDataBuffers::new());
         let running = Arc::new(AtomicBool::new(true));
         let key = Arc::new(RwLock::new(None));
+        let interval = Arc::new(interval);
         let copy_thread = {
             let image_data = image_data.clone();
             let running = running.clone();
             let key = key.clone();
+            let interval = interval.clone();
             thread::spawn(move || {
                 while running.load(Ordering::Relaxed) {
+                    let start = Instant::now();
                     {
                         let key = key.read().unwrap();
                         key.as_ref()
                             .into_iter()
                             .for_each(|k| image_data.render(k));
                     }
-                    interval.into_iter().for_each(thread::sleep);
+                    if let Some(interval) = interval.as_ref().as_ref().map(|&v| v) {
+                        let elapsed = Instant::now().duration_since(start);
+                        if elapsed < interval {
+                            let t = interval - elapsed;
+                            info!("OpenVROverlaySource: sleeping for {}ms", t.as_millis());
+                            thread::sleep(t);
+                        }
+                    }
                 }
             })
         };
@@ -104,15 +118,27 @@ impl OpenVROverlaySource {
             image_data: image_data,
             _copy_thread: JoinOnDrop::from(copy_thread),
             running: running,
+            interval: interval,
         }
     }
+
+    #[inline]
+    pub fn interval(&self) -> Option<Duration> {
+        *self.interval
+    }
 }
+
+#[allow(dead_code)]
+const DEFAULT_INTERVAL: Duration = Duration::from_millis(1000 / 60);
 
 impl obs::source::VideoSource for OpenVROverlaySource {
     const ID: &'static [u8] = b"obs-openvr-overlay\0";
     const OUTPUT_FLAGS: Option<u32> = None;
 
     fn create(settings: &mut obs::sys::obs_data, source: *mut obs::sys::obs_source_t) -> Self {
+        #[cfg(feature = "overlay-interval")]
+        let ret = OpenVROverlaySource::new(source, Some(DEFAULT_INTERVAL));
+        #[cfg(not(feature = "overlay-interval"))]
         let ret = OpenVROverlaySource::new(source, None);
         ret.update(settings);
         ret

@@ -11,7 +11,6 @@ use image::{
 };
 use capture::OpenVRCapture;
 use obs::data::ObsData;
-use crate::timing;
 
 pub struct OpenVRMirrorSource {
     _handle: *mut obs::sys::obs_source,
