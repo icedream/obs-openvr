@@ -3,24 +3,107 @@ use std::{
         CStr,
         CString,
     },
-    sync::RwLock,
+    mem,
+    ops::Deref,
+    time::Duration,
+    sync::{
+        Arc,
+        RwLock,
+        atomic::{
+            AtomicBool,
+            Ordering,
+        },
+    },
+    thread,
 };
 use obs::data::ObsData;
+use openvr::overlay::OverlayImageData;
+use crate::thread_utils::JoinOnDrop;
+
+struct ImageDataBuffers {
+    front: RwLock<Option<OverlayImageData>>,
+    back: RwLock<Option<OverlayImageData>>,
+}
+
+impl ImageDataBuffers {
+    pub fn new() -> Self {
+        ImageDataBuffers {
+            front: RwLock::new(None),
+            back: RwLock::new(None),
+        }
+    }
+
+    pub fn front<'a>(&'a self) -> impl Deref<Target=Option<OverlayImageData>> + 'a {
+        self.front.read().unwrap()
+    }
+
+    pub fn render<K: AsRef<CStr>>(&self, key: K) {
+        // Render to back buffer
+        let mut image_data = self.back.write().unwrap();
+        if let Some(image_data) = image_data.as_mut() {
+            let handle = openvr::overlay::find_overlay(key).ok();
+            if let Some(handle) = handle {
+                if let Err(e) = image_data.refill(handle) {
+                    error!("error refilling overlay image: {:?}", &e);
+                }
+            }
+        } else {
+            *image_data = match openvr::overlay::OverlayImageData::find_overlay(key) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    error!("error getting overlay image: {:?}", &e);
+                    return;
+                },
+            };
+        }
+        // Swap front/back buffers
+        { 
+            let mut front = self.front.write().unwrap();
+            mem::swap::<Option<OverlayImageData>>(&mut *front, &mut *image_data);
+        }
+    }
+}
+
+unsafe impl Send for ImageDataBuffers {}
+unsafe impl Sync for ImageDataBuffers {}
 
 pub struct OpenVROverlaySource {
     _source_handle: *mut obs::sys::obs_source_t,
-    key: RwLock<Option<CString>>,
+    key: Arc<RwLock<Option<CString>>>,
     dimensions: RwLock<Option<(u32, u32)>>,
-    image_data: RwLock<Option<openvr::overlay::OverlayImageData>>,
+    image_data: Arc<ImageDataBuffers>,
+    _copy_thread: JoinOnDrop<()>,
+    running: Arc<AtomicBool>,
 }
 
 impl OpenVROverlaySource {
-    pub fn new(source: *mut obs::sys::obs_source_t) -> Self {
+    pub fn new(source: *mut obs::sys::obs_source_t, interval: Option<Duration>) -> Self {
+        let image_data = Arc::new(ImageDataBuffers::new());
+        let running = Arc::new(AtomicBool::new(true));
+        let key = Arc::new(RwLock::new(None));
+        let copy_thread = {
+            let image_data = image_data.clone();
+            let running = running.clone();
+            let key = key.clone();
+            thread::spawn(move || {
+                while running.load(Ordering::Relaxed) {
+                    {
+                        let key = key.read().unwrap();
+                        key.as_ref()
+                            .into_iter()
+                            .for_each(|k| image_data.render(k));
+                    }
+                    interval.into_iter().for_each(thread::sleep);
+                }
+            })
+        };
         OpenVROverlaySource {
             _source_handle: source,
-            key: RwLock::new(None),
+            key: key,
             dimensions: RwLock::new(None),
-            image_data: RwLock::new(None),
+            image_data: image_data,
+            _copy_thread: JoinOnDrop::from(copy_thread),
+            running: running,
         }
     }
 }
@@ -30,7 +113,7 @@ impl obs::source::VideoSource for OpenVROverlaySource {
     const OUTPUT_FLAGS: Option<u32> = None;
 
     fn create(settings: &mut obs::sys::obs_data, source: *mut obs::sys::obs_source_t) -> Self {
-        let ret = OpenVROverlaySource::new(source);
+        let ret = OpenVROverlaySource::new(source, None);
         ret.update(settings);
         ret
     }
@@ -51,47 +134,28 @@ impl obs::source::VideoSource for OpenVROverlaySource {
     }
 
     fn video_render(&self, _effect: *mut obs::sys::gs_effect_t) {
-        let key = self.key.read().unwrap();
-        if let Some(key) = key.as_ref() {
-            let mut image_data = self.image_data.write().unwrap();
-            if let Some(image_data) = image_data.as_mut() {
-                let handle = openvr::overlay::find_overlay(key).ok();
-                if let Some(handle) = handle {
-                    if let Err(e) = image_data.refill(handle) {
-                        error!("error refilling overlay image: {:?}", &e);
-                    }
-                }
-            } else {
-                *image_data = match openvr::overlay::OverlayImageData::find_overlay(key) {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        error!("error getting overlay image: {:?}", &e);
-                        return;
-                    },
-                };
-            }
-            let overlay_image = if let Some(v) = image_data.as_ref() {
-                v
-            } else {
-                return;
-            };
-            let image_size = overlay_image.dimensions();
-            {
-                let mut dimensions = self.dimensions.write().unwrap();
-                *dimensions = Some(image_size);
-            }
-            let (width, height) = image_size;
-            let mut buffer = overlay_image.data().as_ptr();
-            let mut texture = unsafe {
-                if let Some(texture) = obs::graphics::Texture::new(width, height, obs::sys::gs_color_format::GS_BGRA, 1, &mut buffer, 0) {
-                    texture
-                } else {
-                    error!("gs_texture_create failed");
-                    return;
-                }
-            };
-            obs::source::draw(&mut texture, 0, 0, 0, 0, false);
+        let image_data = self.image_data.front();
+        let overlay_image = if let Some(v) = image_data.as_ref() {
+            v
+        } else {
+            return;
+        };
+        let image_size = overlay_image.dimensions();
+        {
+            let mut dimensions = self.dimensions.write().unwrap();
+            *dimensions = Some(image_size);
         }
+        let (width, height) = image_size;
+        let mut buffer = overlay_image.data().as_ptr();
+        let mut texture = unsafe {
+            if let Some(texture) = obs::graphics::Texture::new(width, height, obs::sys::gs_color_format::GS_BGRA, 1, &mut buffer, 0) {
+                texture
+            } else {
+                error!("gs_texture_create failed");
+                return;
+            }
+        };
+        obs::source::draw(&mut texture, 0, 0, 0, 0, false);
     }
 
     fn get_dimensions(&self) -> (u32, u32) {
@@ -105,5 +169,11 @@ impl obs::source::VideoSource for OpenVROverlaySource {
         let mut key = self.key.write().unwrap();
         let id_key: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"id\0") };
         *key = data.get_string(id_key).and_then(|s| CString::new(s).ok());
+    }
+}
+
+impl Drop for OpenVROverlaySource {
+    fn drop(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
     }
 }

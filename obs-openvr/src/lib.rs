@@ -13,6 +13,7 @@ pub mod module;
 #[cfg(feature = "mirror-source")]
 pub(crate) mod native_utils;
 pub(crate) mod timing;
+pub(crate) mod thread_utils;
 #[cfg(feature = "overlay-source")]
 pub mod overlay;
 #[cfg(feature = "mirror-source")]
