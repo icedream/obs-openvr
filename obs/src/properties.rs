@@ -100,12 +100,6 @@ impl Properties {
             StringPropertyList::from_ptr(ptr).unwrap()
         }
     }
-
-    pub unsafe fn leak(mut self) -> *mut sys::obs_properties {
-        let ret = self.0;
-        self.0 = ptr::null_mut();
-        ret
-    }
 }
 
 impl OwnedPointerContainer<sys::obs_properties> for Properties {
@@ -117,6 +111,12 @@ impl OwnedPointerContainer<sys::obs_properties> for Properties {
     #[inline(always)]
     fn as_ptr_mut(&mut self) -> *mut sys::obs_properties {
         self.0
+    }
+
+    unsafe fn leak(mut self) -> *mut sys::obs_properties {
+        let ret = self.0;
+        self.0 = ptr::null_mut();
+        ret
     }
 }
 

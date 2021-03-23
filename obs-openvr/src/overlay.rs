@@ -19,7 +19,10 @@ use std::{
     },
     thread,
 };
-use obs::data::ObsData;
+use obs::{
+    data::ObsData,
+    OwnedPointerContainer,
+};
 use openvr::overlay::OverlayImageData;
 use crate::thread_utils::JoinOnDrop;
 

@@ -10,7 +10,10 @@ use image::{
     Rgba,
 };
 use capture::OpenVRCapture;
-use obs::data::ObsData;
+use obs::{
+    data::ObsData,
+    OwnedPointerContainer,
+};
 
 pub struct OpenVRMirrorSource {
     _handle: *mut obs::sys::obs_source,

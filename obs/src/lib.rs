@@ -40,4 +40,5 @@ macro_rules! register_video_source {
 pub trait OwnedPointerContainer<T> {
     fn as_ptr(&self) -> *const T;
     fn as_ptr_mut(&mut self) -> *mut T;
+    unsafe fn leak(self) -> *mut T;
 }
