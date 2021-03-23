@@ -2,11 +2,13 @@ pub extern crate obs_sys as sys;
 extern crate libc;
 #[macro_use] extern crate log;
 
+pub mod enums;
 pub mod properties;
 pub mod graphics;
 pub mod source;
 pub mod data;
 pub(crate) mod ptr;
+pub(crate) mod option_ext;
 
 pub use data::Data;
 

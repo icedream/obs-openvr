@@ -8,14 +8,32 @@ use std::{
         DerefMut,
     },
     ptr,
+    str::FromStr,
 };
-use crate::OwnedPointerContainer;
+use crate::{
+    OwnedPointerContainer,
+    enums::ObsEnum,
+};
 
 /// Safe access functions for `sys::obs_data`
 pub trait ObsData {
     fn get_string<'a, K: AsRef<CStr>>(&'a self, s: K) -> Option<&'a str>;
     fn get_int<K: AsRef<CStr>>(&self, k: K) -> libc::c_longlong;
     fn get_bool<K: AsRef<CStr>>(&self, k: K) -> bool;
+    fn get_string_enum<T: ObsEnum, K: AsRef<CStr>>(&self, k: K) -> Option<Result<T, <T as FromStr>::Err>> {
+        self.get_string(k)
+            .map(|s| s.parse::<T>())
+    }
+    fn get_string_enum_opt<T: ObsEnum, K: AsRef<CStr>>(&self, k: K) -> Option<T> {
+        self.get_string(k)
+            .and_then(|s| s.parse::<T>().ok())
+    }
+    fn get_string_enum_default<T, K: AsRef<CStr>>(&self, k: K) -> T where
+        T: ObsEnum + Default,
+    {
+        use crate::option_ext::*;
+        self.get_string_enum_opt(k).or_default()
+    }
 }
 
 impl ObsData for sys::obs_data {
