@@ -1,7 +1,7 @@
 pub extern crate obs_sys as sys;
 extern crate libc;
 #[macro_use] extern crate log;
-extern crate option_ext;
+extern crate mcoffin_option_ext as option_ext;
 
 pub mod enums;
 pub mod properties;

@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 libc = "*"
 log = "0.4"
-option-ext = { path = "../option-ext" }
+mcoffin-option-ext = "0.1"
 
 [dependencies.obs-sys]
 path = "../obs-sys"

@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 thiserror = "^1.0.24"
-option-ext = { path = "../option-ext" }
+mcoffin-option-ext = "0.1"

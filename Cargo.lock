@@ -80,7 +80,7 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 name = "build-profile"
 version = "0.1.0"
 dependencies = [
- "option-ext",
+ "mcoffin-option-ext",
  "thiserror",
 ]
 
@@ -383,6 +383,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcoffin-option-ext"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97713614af9bc0c9aa1aeeeba25869ce411ea9e5b9e45005562d98b87b3f0b49"
+
+[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,8 +498,8 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "log",
+ "mcoffin-option-ext",
  "obs-sys",
- "option-ext",
 ]
 
 [[package]]
@@ -544,10 +550,6 @@ dependencies = [
  "bindgen",
  "pkg-config",
 ]
-
-[[package]]
-name = "option-ext"
-version = "0.1.0"
 
 [[package]]
 name = "peeking_take_while"

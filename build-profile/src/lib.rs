@@ -1,5 +1,5 @@
 extern crate thiserror;
-extern crate option_ext;
+extern crate mcoffin_option_ext as option_ext;
 
 use std::{
     env,

@@ -6,6 +6,5 @@ members = [
 	"openvr-sys",
 	"openvr",
 	"obs",
-	"build-profile",
-	"option-ext",
+	"build-profile"
 ]
