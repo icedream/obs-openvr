@@ -5,6 +5,7 @@ extern crate glfw;
 extern crate image;
 #[macro_use] extern crate log;
 extern crate env_logger;
+extern crate thiserror;
 
 pub use obs::sys as obs_sys;
 
@@ -22,53 +23,62 @@ pub mod mirror;
 pub use openvr::sys as openvr_sys;
 
 use std::{
-    io,
-    fmt::Display,
+    borrow::Cow,
 };
+use thiserror::Error;
 
-fn obs_module_load_result() -> Result<(), impl Display + 'static> {
-    use std::borrow::Cow;
-
-    // Initialize logging
-    logging::init();
-    info!("logging initialized");
-
-    // Initialize OpenVR
-    let vr_initialized = openvr::init(openvr_sys::EVRApplicationType::EVRApplicationType_VRApplication_Background)
-        .map(|result| result.value())
-        .map_err(|e| Cow::Owned(format!("OpenVR failed to initialize: {:?}", &e)))?;
-    if !vr_initialized {
-        return Err(Cow::Borrowed("OpenVR failed to initialize, but with no error"));
-    }
-
-    // Create source info struct, and register it
-    #[cfg(feature = "mirror-source")]
-    obs::register_video_source!(mirror::OpenVRMirrorSource);
-    #[cfg(feature = "overlay-source")]
-    obs::register_video_source!(overlay::OpenVROverlaySource);
-
-    trace!("loaded");
-    Ok(())
+#[derive(Error, Debug)]
+enum ObsOpenVRUnloadError {
+    #[error("OpenVR was not actually shut down on obs_module_unload")]
+    OpenVRShutdown,
 }
 
-#[no_mangle]
-pub extern "C" fn obs_module_load() -> bool {
-    match obs_module_load_result() {
-        Ok(_) => true,
-        Err(e) => {
-            use io::Write;
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = write!(&mut stderr, "error loading {}: {}", env!("CARGO_CRATE_NAME"), &e);
-            false
-        },
+struct ObsOpenVRModule {}
+
+impl ObsOpenVRModule {
+    fn unload_internal() -> Result<(), <Self as obs::ObsModule>::UnloadErr> {
+        trace!("unloading");
+        if !openvr::shutdown() {
+            return Err(ObsOpenVRUnloadError::OpenVRShutdown);
+        }
+        trace!("unloaded");
+        Ok(())
     }
 }
 
-#[no_mangle]
-pub extern "C" fn obs_module_unload() {
-    if !openvr::shutdown() {
-        warn!("OpenVR was not actually shut down on obs_module_unload");
+impl obs::ObsModule for ObsOpenVRModule {
+    const CRATE_NAME: &'static str = env!("CARGO_CRATE_NAME");
+    type LoadErr = Cow<'static, str>;
+    type UnloadErr = ObsOpenVRUnloadError;
+    fn load() -> Result<(), Self::LoadErr> {
+        // Initialize logging
+        logging::init();
+        info!("logging initialized");
+
+        // Initialize OpenVR
+        let vr_initialized = openvr::init(openvr_sys::EVRApplicationType::EVRApplicationType_VRApplication_Background)
+            .map(|result| result.value())
+            .map_err(|e| Cow::Owned(format!("OpenVR failed to initialize: {:?}", &e)))?;
+        if !vr_initialized {
+            return Err(Cow::Borrowed("OpenVR failed to initialize, but with no error"));
+        }
+
+        // Create source info struct, and register it
+        #[cfg(feature = "mirror-source")]
+        obs::register_video_source!(mirror::OpenVRMirrorSource);
+        #[cfg(feature = "overlay-source")]
+        obs::register_video_source!(overlay::OpenVROverlaySource);
+
+        trace!("loaded");
+        Ok(())
     }
-    trace!("unloaded");
+    fn unload() -> Result<(), Self::UnloadErr> {
+        let ret = Self::unload_internal();
+        if let Err(e) = ret.as_ref() {
+            warn!("error unloading {}: {}", Self::CRATE_NAME, e);
+        }
+        ret
+    }
 }
+
+obs::register_module!(ObsOpenVRModule);

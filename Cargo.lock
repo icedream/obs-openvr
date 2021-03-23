@@ -516,6 +516,7 @@ dependencies = [
  "obs",
  "openvr",
  "pkg-config",
+ "thiserror",
 ]
 
 [[package]]

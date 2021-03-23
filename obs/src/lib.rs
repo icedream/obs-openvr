@@ -11,9 +11,12 @@ pub mod data;
 pub(crate) mod ptr;
 
 pub use data::Data;
+pub use properties::Properties;
 
 use std::{
+    io,
     mem,
+    fmt::Display,
 };
 
 pub unsafe fn register_source(info: &'static sys::obs_source_info, info_size: Option<usize>) {
@@ -35,6 +38,62 @@ macro_rules! register_video_source {
             unsafe {
                 $crate::register_source(SOURCE_INFO.as_ref().unwrap(), None)
             }
+        }
+    };
+}
+
+pub trait ObsModule {
+    type LoadErr;
+    type UnloadErr;
+    const CRATE_NAME: &'static str;
+    fn load() -> Result<(), Self::LoadErr>;
+    fn unload() -> Result<(), Self::UnloadErr>;
+}
+
+pub trait ObsModuleExt: ObsModule {
+    fn do_load() -> bool;
+    fn do_unload();
+}
+
+impl<T> ObsModuleExt for T where
+    T: ObsModule,
+    <T as ObsModule>::LoadErr: Display,
+    <T as ObsModule>::UnloadErr: Display,
+{
+    fn do_load() -> bool {
+        match <T as ObsModule>::load() {
+            Ok(_) => true,
+            Err(e) => {
+                use std::io::Write;
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = write!(&mut stderr, "error loading {}: {}", <T as ObsModule>::CRATE_NAME, &e);
+                false
+            },
+        }
+    }
+
+    fn do_unload() {
+        if let Err(e) = <T as ObsModule>::unload() {
+            use std::io::Write;
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = write!(&mut stderr, "error unloading: {}: {}", <T as ObsModule>::CRATE_NAME, &e);
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! register_module {
+    ($t:ty) => {
+        #[no_mangle]
+        pub extern "C" fn obs_module_load() -> bool {
+            <$t as $crate::ObsModuleExt>::do_load()
+        }
+
+        #[no_mangle]
+        pub extern "C" fn obs_module_unload() {
+            <$t as $crate::ObsModuleExt>::do_unload();
         }
     };
 }
