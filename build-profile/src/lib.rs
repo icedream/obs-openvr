@@ -1,13 +1,12 @@
 extern crate thiserror;
-
-mod option_ext;
+extern crate option_ext;
 
 use std::{
     env,
     str::FromStr,
 };
 use thiserror::Error;
-use option_ext::OptionExt;
+use option_ext::*;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

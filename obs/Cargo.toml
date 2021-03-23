@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 libc = "*"
 log = "0.4"
+option-ext = { path = "../option-ext" }
 
 [dependencies.obs-sys]
 path = "../obs-sys"

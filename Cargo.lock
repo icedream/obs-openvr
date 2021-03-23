@@ -80,6 +80,7 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 name = "build-profile"
 version = "0.1.0"
 dependencies = [
+ "option-ext",
  "thiserror",
 ]
 
@@ -492,6 +493,7 @@ dependencies = [
  "libc",
  "log",
  "obs-sys",
+ "option-ext",
 ]
 
 [[package]]
@@ -542,6 +544,10 @@ dependencies = [
  "bindgen",
  "pkg-config",
 ]
+
+[[package]]
+name = "option-ext"
+version = "0.1.0"
 
 [[package]]
 name = "peeking_take_while"
