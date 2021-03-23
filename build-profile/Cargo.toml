@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 thiserror = "^1.0.24"
-mcoffin-option-ext = "0.1"
+mcoffin-option-ext = "0.2"
