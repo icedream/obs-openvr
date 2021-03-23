@@ -12,6 +12,19 @@ pub struct TextureSize {
     pub height: u32,
 }
 
+impl<'a> From<&'a CopyCtx> for TextureSize {
+    fn from(ctx: &'a CopyCtx) -> TextureSize {
+        let mut ret = TextureSize {
+            width: 0,
+            height: 0,
+        };
+        unsafe {
+            obs_openvr_copy_context_get_texture_size(ctx as *const CopyCtx, &mut ret as *mut _);
+        }
+        ret
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CopyCtx {
@@ -37,14 +50,7 @@ impl CopyCtx {
     }
 
     pub fn get_size(&self) -> TextureSize {
-        let mut ret = TextureSize {
-            width: 0,
-            height: 0,
-        };
-        unsafe {
-            obs_openvr_copy_context_get_texture_size(self as *const CopyCtx, &mut ret as *mut _);
-        }
-        ret
+        TextureSize::from(self)
     }
 }
 
