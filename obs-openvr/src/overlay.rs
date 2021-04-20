@@ -12,6 +12,7 @@ use std::{
     sync::{
         Arc,
         RwLock,
+        Mutex,
         atomic::{
             AtomicBool,
             Ordering,
@@ -26,9 +27,12 @@ use obs::{
 use openvr::overlay::OverlayImageData;
 use crate::thread_utils::JoinOnDrop;
 
+const MAX_ERROR_INTERVAL: Duration = Duration::from_millis(5000);
+
 struct ImageDataBuffers {
     front: RwLock<Option<OverlayImageData>>,
     back: RwLock<Option<OverlayImageData>>,
+    last_logged: Mutex<Option<Instant>>,
 }
 
 impl ImageDataBuffers {
@@ -36,11 +40,26 @@ impl ImageDataBuffers {
         ImageDataBuffers {
             front: RwLock::new(None),
             back: RwLock::new(None),
+            last_logged: Mutex::new(None),
         }
     }
 
     pub fn front<'a>(&'a self) -> impl Deref<Target=Option<OverlayImageData>> + 'a {
         self.front.read().unwrap()
+    }
+
+    fn do_error_log(&self, prefix: &str, e: openvr::sys::EVROverlayError) {
+        let mut last_logged = self.last_logged.lock().unwrap();
+        let now = Instant::now();
+        let should_log = last_logged
+            .map(|t| now.duration_since(t) >= MAX_ERROR_INTERVAL)
+            .unwrap_or(true);
+        if e != openvr::sys::EVROverlayError::EVROverlayError_VROverlayError_UnknownOverlay || should_log {
+            *last_logged = Some(now);
+            error!("{}: {:?}", prefix, &e);
+        } else {
+            trace!("skipping logging due to rate limiting");
+        }
     }
 
     pub fn render<K: AsRef<CStr>>(&self, key: K) {
@@ -50,14 +69,16 @@ impl ImageDataBuffers {
             let handle = openvr::overlay::find_overlay(key).ok();
             if let Some(handle) = handle {
                 if let Err(e) = image_data.refill(handle) {
-                    error!("error refilling overlay image: {:?}", &e);
+                    self.do_error_log("error refilling overlay image", e);
+                    // error!("error refilling overlay image: {:?}", &e);
                 }
             }
         } else {
             *image_data = match openvr::overlay::OverlayImageData::find_overlay(key) {
                 Ok(v) => Some(v),
                 Err(e) => {
-                    error!("error getting overlay image: {:?}", &e);
+                    self.do_error_log("error refilling overlay image", e);
+                    // error!("error getting overlay image: {:?}", &e);
                     return;
                 },
             };
