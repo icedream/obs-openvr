@@ -16,6 +16,7 @@ image = "0.23"
 log = "0.4"
 env_logger = "0.8"
 thiserror = "^1.0.24"
+mcoffin-option-ext = "0.2"
 
 [dependencies.obs]
 path = "../obs"

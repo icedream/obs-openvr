@@ -513,6 +513,7 @@ dependencies = [
  "image",
  "libc",
  "log",
+ "mcoffin-option-ext",
  "obs",
  "openvr",
  "pkg-config",

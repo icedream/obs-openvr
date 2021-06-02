@@ -198,7 +198,7 @@ impl obs::source::VideoSource for OpenVROverlaySource {
         let (width, height) = image_size;
         let mut buffer = overlay_image.data().as_ptr();
         let mut texture = unsafe {
-            if let Some(texture) = obs::graphics::Texture::new(width, height, obs::sys::gs_color_format::GS_BGRA, 1, &mut buffer, 0) {
+            if let Some(texture) = obs::graphics::Texture::new(width, height, obs::sys::gs_color_format::GS_BGRA, &mut [buffer], 0) {
                 texture
             } else {
                 error!("gs_texture_create failed");

@@ -6,6 +6,7 @@ extern crate image;
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate thiserror;
+extern crate mcoffin_option_ext;
 
 pub use obs::sys as obs_sys;
 

@@ -38,7 +38,7 @@ unsafe fn leave_graphics() {
 
 /// Enters the obs graphics context, runs the provided function, then leaves the obs graphics
 /// context. see: `obs_enter_graphics` and `obs_leave_graphics` in the obs-studio API
-pub fn with_graphics<Ret, F: FnOnce() -> Ret>(f: F) -> Ret {
+pub fn with_graphics<Ret, F: FnMut() -> Ret>(mut f: F) -> Ret {
     unsafe { enter_graphics(); }
     let ret = f();
     unsafe { leave_graphics(); }
@@ -78,8 +78,8 @@ impl GsTexture for sys::gs_texture_t {
 pub struct Texture<'a>(*mut sys::gs_texture_t, PhantomData<&'a [u8]>);
 
 impl<'a> Texture<'a> {
-    pub unsafe fn new(width: u32, height: u32, format: sys::gs_color_format, levels: u32, data: &'a mut *const u8, flags: u32) -> Option<Self> {
-        let p = sys::gs_texture_create(width, height, format, levels, data as *mut _, flags);
+    pub unsafe fn new(width: u32, height: u32, format: sys::gs_color_format, data: &mut [*const u8], flags: u32) -> Option<Self> {
+        let p = sys::gs_texture_create(width, height, format, data.len() as u32, data.as_mut_ptr(), flags);
         if p.is_null() {
             None
         } else {
