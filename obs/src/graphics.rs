@@ -46,6 +46,7 @@ pub fn with_graphics<Ret, F: FnMut() -> Ret>(mut f: F) -> Ret {
 }
 
 pub trait GsTexture {
+    unsafe fn set_image_unchecked(&mut self, data: &[u8], linesize: u32, inverted: bool);
     fn get_width(&self) -> u32;
     fn get_height(&self) -> u32;
     fn get_color_format(&self) -> sys::gs_color_format;
@@ -56,6 +57,11 @@ pub trait GsTexture {
 }
 
 impl GsTexture for sys::gs_texture_t {
+    unsafe fn set_image_unchecked(&mut self, data: &[u8], linesize: u32, inverted: bool) {
+        unsafe {
+            sys::gs_texture_set_image(self as *mut _, data.as_ptr(), linesize, inverted);
+        }
+    }
     fn get_width(&self) -> u32 {
         unsafe {
             sys::gs_texture_get_width(self as *const _)

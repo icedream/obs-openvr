@@ -153,8 +153,9 @@ unsafe extern "C" fn video_source_destroy<S: VideoSource>(data: *mut libc::c_voi
     mem::drop(ptr);
 }
 
-pub fn draw(image: &mut sys::gs_texture_t, x: libc::c_int, y: libc::c_int, cx: u32, cy: u32, flip: bool) {
+pub fn draw(image: &sys::gs_texture_t, x: libc::c_int, y: libc::c_int, cx: u32, cy: u32, flip: bool) {
     unsafe {
+        let image = image as *const _;
         sys::obs_source_draw(image as *mut _, x, y, cx, cy, flip);
     }
 }

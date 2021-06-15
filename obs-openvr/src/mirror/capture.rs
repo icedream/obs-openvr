@@ -8,6 +8,7 @@ use crate::mirror::utils::{
     self,
     TextureFormat,
 };
+use obs::graphics::GsTexture;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TextureCreationError {
@@ -21,6 +22,8 @@ pub enum TextureCreationError {
 pub enum CopyTextureError {
     #[error("OpenGL error: {0}")]
     Gl(u32),
+    #[error("Error creating OBS texture: {0}")]
+    TextureCreation(#[from] TextureCreationError)
 }
 
 fn required_buffer_size(dimensions: (i32, i32), format: TextureFormat) -> usize {
@@ -33,6 +36,8 @@ pub struct OpenVRMirrorCapture {
     dimensions: (i32, i32),
     format: TextureFormat,
     buffer: Vec<u8>,
+    texture_flags: u32,
+    texture: Option<obs::graphics::Texture>,
 }
 
 impl Debug for OpenVRMirrorCapture {
@@ -47,7 +52,7 @@ impl Debug for OpenVRMirrorCapture {
 }
 
 impl OpenVRMirrorCapture {
-    pub fn new(eye: openvr::sys::EVREye) -> Result<Self, openvr::sys::EVRCompositorError> {
+    pub fn new(eye: openvr::sys::EVREye, texture_flags: u32) -> Result<Self, openvr::sys::EVRCompositorError> {
         trace!("Creating OpenVRMirrorCapture with eye: {:?}", &eye);
         let (texture_info, texture_size) = obs::graphics::with_graphics(|| {
             unsafe {
@@ -66,6 +71,8 @@ impl OpenVRMirrorCapture {
             dimensions: texture_size.into(),
             format: format,
             buffer: vec![0; required_buffer_size(texture_size.into(), format)],
+            texture_flags: texture_flags,
+            texture: None,
         };
         trace!("Created capture context: {:?}", &ret);
         Ok(ret)
@@ -87,7 +94,17 @@ impl OpenVRMirrorCapture {
 
     pub unsafe fn copy_texture(&mut self) -> Result<(), CopyTextureError> {
         utils::copy_gl_texture(self.texture_info.id, self.format.into(), self.buffer.as_mut_ptr())
-            .map_err(CopyTextureError::Gl)
+            .map_err(CopyTextureError::Gl)?;
+        let linesize = self.linesize();
+        if let Some(texture) = self.texture.as_mut() {
+            texture.set_image_unchecked(self.buffer.as_slice(), linesize, false);
+            Ok(())
+        } else {
+            self.texture = self.create_texture()
+                .map(Some)
+                .map_err(CopyTextureError::TextureCreation)?;
+            Ok(())
+        }
     }
 
     #[inline(always)]
@@ -105,13 +122,22 @@ impl OpenVRMirrorCapture {
         self.dimensions.1
     }
 
-    pub unsafe fn create_texture(&self, flags: u32) -> Result<obs::graphics::Texture, TextureCreationError> {
+    fn linesize(&self) -> u32 {
+        self.width() as u32 * self.format.bytes_per_pixel() as u32
+    }
+
+    #[inline(always)]
+    pub fn texture<'a>(&'a self) -> Option<&'a obs::graphics::Texture> {
+        self.texture.as_ref()
+    }
+
+    unsafe fn create_texture(&self) -> Result<obs::graphics::Texture, TextureCreationError> {
         let (w, h) = self.dimensions();
         let format: Option<obs::sys::gs_color_format> = self.format.into();
         let format = format
             .map(Ok)
             .unwrap_or_else(|| Err(TextureCreationError::FormatTranslation(self.format)))?;
-        obs::graphics::Texture::new(w as u32, h as u32, format, &[self.buffer.as_slice().as_ptr()], flags)
+        obs::graphics::Texture::new(w as u32, h as u32, format, &[self.buffer.as_slice().as_ptr()], self.texture_flags)
             .map(Ok)
             .unwrap_or(Err(TextureCreationError::TextureAllocation))
     }

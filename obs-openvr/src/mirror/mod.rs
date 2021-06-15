@@ -54,7 +54,7 @@ impl<'a> TryFrom<&'a OpenVRMirrorSourceSettings> for OpenVRMirrorCapture {
 
     #[inline]
     fn try_from(settings: &'a OpenVRMirrorSourceSettings) -> Result<Self, Self::Error> {
-        OpenVRMirrorCapture::new(settings.eye())
+        OpenVRMirrorCapture::new(settings.eye(), OBS_TEXTURE_FLAGS)
     }
 }
 
@@ -181,15 +181,10 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
 
     fn video_render(&self, _effect: *mut obs::sys::gs_effect_t) {
         let capture_context = self.capture_context.read().unwrap();
-        if let Some(capture_context) = capture_context.as_ref() {
-            let mut texture = match with_graphics(|| unsafe { capture_context.create_texture(OBS_TEXTURE_FLAGS) }) {
-                Ok(v) => v,
-                Err(e) => {
-                    error!("Error creating OBS texture: {}", &e);
-                    return;
-                },
-            };
-            obs::source::draw(&mut texture, 0, 0, 0, 0, false);
+        if let Some(texture) = capture_context.as_ref().and_then(OpenVRMirrorCapture::texture) {
+            with_graphics(|| {
+                obs::source::draw(&*texture, 0, 0, 0, 0, false);
+            });
         }
     }
 }
