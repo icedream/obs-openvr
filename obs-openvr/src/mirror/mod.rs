@@ -22,6 +22,9 @@ use obs::{
 
 const DEFAULT_EYE: openvr::sys::EVREye = openvr::sys::EVREye::EVREye_Eye_Left;
 
+const OBS_TEXTURE_FLAGS: u32 = obs::sys::GS_DYNAMIC;
+
+#[derive(Debug)]
 struct OpenVRMirrorSourceSettings {
     eye: openvr::sys::EVREye,
 }
@@ -29,6 +32,7 @@ struct OpenVRMirrorSourceSettings {
 impl OpenVRMirrorSourceSettings {
     fn update<D: obs::data::ObsData>(&mut self, data: &D) {
         self.eye = data.get_eye();
+        trace!("OpenVRMirrorSourceSettings::update: {:?}", self);
     }
 
     #[inline(always)]
@@ -57,7 +61,6 @@ impl<'a> TryFrom<&'a OpenVRMirrorSourceSettings> for OpenVRMirrorCapture {
 pub struct OpenVRMirrorSource {
     handle: *mut obs::sys::obs_source,
     settings: RwLock<OpenVRMirrorSourceSettings>,
-    dimensions: (u32, u32),
     capture_context: RwLock<Option<OpenVRMirrorCapture>>,
 }
 
@@ -66,11 +69,11 @@ impl OpenVRMirrorSource {
         let ret = OpenVRMirrorSource {
             handle: handle,
             settings: RwLock::new(OpenVRMirrorSourceSettings::from(settings as &_)),
-            dimensions: (0, 0),
             capture_context: RwLock::new(None),
         };
         {
             let settings = ret.settings.read().unwrap();
+            trace!("Creating capture context with settings: {:?}", &*settings);
             ret.recreate_capture_context(&*settings);
         }
         ret
@@ -93,16 +96,6 @@ impl OpenVRMirrorSource {
         unsafe {
             obs::sys::obs_source_showing(self.handle)
         }
-    }
-
-    #[inline(always)]
-    pub fn width(&self) -> u32 {
-        self.dimensions.0
-    }
-
-    #[inline(always)]
-    pub fn height(&self) -> u32 {
-        self.dimensions.1
     }
 }
 
@@ -141,7 +134,13 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
     }
 
     fn get_dimensions(&self) -> (u32, u32) {
-        self.dimensions
+        let capture_context = self.capture_context.read().unwrap();
+        capture_context.as_ref()
+            .map(|ctx| {
+                let (w, h) = ctx.dimensions();
+                (w as u32, h as u32)
+            })
+            .unwrap_or((0, 0))
     }
 
     fn get_properties(&self) -> *mut obs::sys::obs_properties {
@@ -165,5 +164,32 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         let mut settings = self.settings.write().unwrap();
         settings.update(data);
         self.recreate_capture_context(&*settings);
+    }
+
+    fn video_tick(&self, seconds: f32) {
+        if !self.is_showing() {
+            return;
+        }
+        let mut capture_context = self.capture_context.write().unwrap();
+        if let Some(capture_context) = capture_context.as_mut() {
+            if let Err(e) = with_graphics(|| unsafe { capture_context.copy_texture() }) {
+                error!("Error copying texture data from OpenVR mirror: {:?}", &e);
+                return;
+            }
+        }
+    }
+
+    fn video_render(&self, _effect: *mut obs::sys::gs_effect_t) {
+        let capture_context = self.capture_context.read().unwrap();
+        if let Some(capture_context) = capture_context.as_ref() {
+            let mut texture = match with_graphics(|| unsafe { capture_context.create_texture(OBS_TEXTURE_FLAGS) }) {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("Error creating OBS texture: {}", &e);
+                    return;
+                },
+            };
+            obs::source::draw(&mut texture, 0, 0, 0, 0, false);
+        }
     }
 }

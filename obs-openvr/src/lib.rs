@@ -67,8 +67,8 @@ impl obs::ObsModule for ObsOpenVRModule {
         // Create source info struct, and register it
         #[cfg(feature = "mirror-source")]
         obs::register_video_source!(mirror::OpenVRMirrorSource);
-        #[cfg(feature = "overlay-source")]
-        obs::register_video_source!(overlay::OpenVROverlaySource);
+        // #[cfg(feature = "overlay-source")]
+        // obs::register_video_source!(overlay::OpenVROverlaySource);
 
         trace!("loaded");
         Ok(())

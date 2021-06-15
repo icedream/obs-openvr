@@ -27,12 +27,12 @@ pub fn isolate_context<Ret, F>(f: F) -> Ret where
 }
 
 unsafe fn enter_graphics() {
-    trace!("obs_enter_graphics");
+    // trace!("obs_enter_graphics");
     sys::obs_enter_graphics();
 }
 
 unsafe fn leave_graphics() {
-    trace!("obs_leave_graphics");
+    // trace!("obs_leave_graphics");
     sys::obs_leave_graphics();
 }
 
@@ -75,15 +75,16 @@ impl GsTexture for sys::gs_texture_t {
     }
 }
 
-pub struct Texture<'a>(*mut sys::gs_texture_t, PhantomData<&'a [u8]>);
+pub struct Texture(*mut sys::gs_texture_t);
 
-impl<'a> Texture<'a> {
-    pub unsafe fn new(width: u32, height: u32, format: sys::gs_color_format, data: &mut [*const u8], flags: u32) -> Option<Self> {
-        let p = sys::gs_texture_create(width, height, format, data.len() as u32, data.as_mut_ptr(), flags);
+impl Texture {
+    pub unsafe fn new(width: u32, height: u32, format: sys::gs_color_format, data: &[*const u8], flags: u32) -> Option<Self> {
+        let datap = data.as_ptr() as *mut _;
+        let p = sys::gs_texture_create(width, height, format, data.len() as u32, datap, flags);
         if p.is_null() {
             None
         } else {
-            Some(Texture(p, PhantomData {}))
+            Some(Texture(p))
         }
     }
 
@@ -104,7 +105,7 @@ impl<'a> Texture<'a> {
     }
 }
 
-impl<'a> Deref for Texture<'a> {
+impl Deref for Texture {
     type Target = sys::gs_texture_t;
 
     #[inline]
@@ -115,7 +116,7 @@ impl<'a> Deref for Texture<'a> {
     }
 }
 
-impl<'a> DerefMut for Texture<'a> {
+impl DerefMut for Texture {
     #[inline]
     fn deref_mut(&mut self) -> &mut <Self as Deref>::Target {
         unsafe {
@@ -124,13 +125,15 @@ impl<'a> DerefMut for Texture<'a> {
     }
 }
 
-impl<'a> Drop for Texture<'a> {
+impl Drop for Texture {
     fn drop(&mut self) {
-        unsafe {
-            let p = self.leak();
-            if !p.is_null() {
-                sys::gs_texture_destroy(p);
+        with_graphics(|| {
+            unsafe {
+                let p = self.leak();
+                if !p.is_null() {
+                    sys::gs_texture_destroy(p);
+                }
             }
-        }
+        });
     }
 }
