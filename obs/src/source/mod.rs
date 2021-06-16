@@ -1,3 +1,5 @@
+mod async_video;
+
 use obs_sys as sys;
 
 use std::{
@@ -6,6 +8,8 @@ use std::{
     marker::PhantomData,
 };
 use crate::ptr::*;
+
+pub use async_video::AsyncVideoSource;
 
 pub struct RawSourceInfo<'a>(pub sys::obs_source_info, PhantomData<&'a ()>);
 

@@ -1,7 +1,6 @@
 use obs_sys as sys;
 
 use std::{
-    marker::PhantomData,
     ops::{
         Deref,
         DerefMut,

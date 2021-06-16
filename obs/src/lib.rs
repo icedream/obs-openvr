@@ -42,6 +42,24 @@ macro_rules! register_video_source {
     };
 }
 
+#[macro_export]
+macro_rules! register_async_video_source {
+    ($t:ty) => {
+        {
+            static mut SOURCE_INFO: Option<$crate::sys::obs_source_info> = None;
+            static FILL_INFO: std::sync::Once = std::sync::Once::new();
+            FILL_INFO.call_once(|| {
+                unsafe {
+                    SOURCE_INFO = Some(<$t as $crate::source::AsyncVideoSource>::raw_source_info().unwrap());
+                }
+            });
+            unsafe {
+                $crate::register_source(SOURCE_INFO.as_ref().unwrap(), None)
+            }
+        }
+    };
+}
+
 pub trait ObsModule {
     type LoadErr;
     type UnloadErr;
