@@ -4,15 +4,8 @@ mod capture;
 use capture::OpenVRMirrorCapture;
 use std::{
     convert::TryFrom,
-    ffi::{
-        self,
-        CStr,
-    },
-    io,
-    sync::{
-        mpsc::Receiver,
-        RwLock,
-    },
+    ffi::CStr,
+    sync::RwLock,
 };
 use obs::{
     graphics::with_graphics,
@@ -166,7 +159,7 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
         self.recreate_capture_context(&*settings);
     }
 
-    fn video_tick(&self, seconds: f32) {
+    fn video_tick(&self, _seconds: f32) {
         if !self.is_showing() {
             return;
         }

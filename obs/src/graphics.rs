@@ -58,10 +58,9 @@ pub trait GsTexture {
 
 impl GsTexture for sys::gs_texture_t {
     unsafe fn set_image_unchecked(&mut self, data: &[u8], linesize: u32, inverted: bool) {
-        unsafe {
-            sys::gs_texture_set_image(self as *mut _, data.as_ptr(), linesize, inverted);
-        }
+        sys::gs_texture_set_image(self as *mut _, data.as_ptr(), linesize, inverted);
     }
+
     fn get_width(&self) -> u32 {
         unsafe {
             sys::gs_texture_get_width(self as *const _)

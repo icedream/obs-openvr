@@ -4,6 +4,7 @@ extern crate pkg_config;
 use std::{
     collections::LinkedList,
     iter,
+    path::Path,
 };
 
 struct DependencyConfig {
@@ -26,6 +27,18 @@ impl DependencyConfig {
 
 const OPENVR_UTILS_LIBRARY_NAME: &'static str = "libopenvr-utils.a";
 
+trait BuildExt {
+    fn file_rebuild<P: AsRef<Path>>(&mut self, p: P) -> &mut Self;
+}
+
+impl BuildExt for cc::Build {
+    fn file_rebuild<P: AsRef<Path>>(&mut self, p: P) -> &mut Self {
+        let p = p.as_ref();
+        println!("cargo:rerun-if-changed={}", p.display());
+        self.file(p)
+    }
+}
+
 fn main() {
     let dep_config = DependencyConfig::new()
         .expect("Failed to find dependency information");
@@ -36,7 +49,8 @@ fn main() {
     dep_config.cflags.iter().fold(&mut vr_utils_build, |build, flag| build.flag(flag));
     vr_utils_build
         .flag("-std=c++2a")
-        .file("src/openvr-utils.cpp")
+        .file_rebuild("src/openvr-utils.cpp")
+        .file_rebuild("src/overlay-utils.cpp")
         .compile(OPENVR_UTILS_LIBRARY_NAME);
     // let library_path = {
     //     let mut p = PathBuf::from(env::var("OUT_DIR").unwrap());
