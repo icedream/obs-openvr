@@ -163,3 +163,8 @@ pub fn draw(image: &sys::gs_texture_t, x: libc::c_int, y: libc::c_int, cx: u32, 
         sys::obs_source_draw(image as *mut _, x, y, cx, cy, flip);
     }
 }
+
+pub unsafe fn output_video2(source: *mut sys::obs_source_t, frame: &sys::obs_source_frame2) {
+    let frame = frame as *const _;
+    sys::obs_source_output_video2(source, frame);
+}

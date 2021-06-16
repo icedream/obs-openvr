@@ -1,3 +1,5 @@
+mod async_source;
+
 use std::{
     cell::Cell,
     ffi::{
@@ -22,6 +24,8 @@ use obs::{
         with_graphics,
     },
 };
+
+pub use async_source::OpenVRAsyncOverlaySource;
 
 pub struct OpenVROverlaySource {
     handle: *mut obs::sys::obs_source_t,
@@ -140,7 +144,7 @@ impl obs::source::VideoSource for OpenVROverlaySource {
     }
 }
 
-mod keys {
+pub(crate) mod keys {
     use std::ffi::CStr;
 
     #[inline(always)]

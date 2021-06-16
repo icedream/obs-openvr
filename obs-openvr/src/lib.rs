@@ -68,6 +68,8 @@ impl obs::ObsModule for ObsOpenVRModule {
         obs::register_video_source!(mirror::OpenVRMirrorSource);
         #[cfg(feature = "overlay-source")]
         obs::register_video_source!(overlay::OpenVROverlaySource);
+        #[cfg(feature = "overlay-source")]
+        obs::register_async_video_source!(overlay::OpenVRAsyncOverlaySource);
 
         trace!("loaded");
         Ok(())
