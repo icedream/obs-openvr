@@ -117,6 +117,8 @@ fn spawn_overlay_thread(source: *mut obs::sys::obs_source_t, running: Arc<Atomic
                     color_range_min: [0.0; 3],
                     color_range_max: [0.0; 3],
                     flip: false,
+                    flags: 0,
+                    trc: 0
                 });
             }
         }

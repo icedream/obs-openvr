@@ -64,7 +64,7 @@ impl OpenVRMirrorSource {
             settings: RwLock::new(OpenVRMirrorSourceSettings::from(settings as &_)),
             capture_context: RwLock::new(None),
         };
-        {
+        if try_init_openvr() {
             let settings = ret.settings.read().unwrap();
             trace!("Creating capture context with settings: {:?}", &*settings);
             ret.recreate_capture_context(&*settings);
@@ -114,6 +114,19 @@ impl<T> MirrorSourceSettings for T where
     }
 }
 
+fn try_init_openvr() -> bool {
+    use crate::init_openvr;
+    let init_result = init_openvr();
+    trace!("init_result: {:?}", &init_result);
+    match init_result {
+        Ok(..) => true,
+        Err(e) => {
+            warn!("Error initializing openvr from mirror source: {}", &e);
+            false
+        },
+    }
+}
+
 impl obs::source::VideoSource for OpenVRMirrorSource {
     const ID: &'static [u8] = b"obs-openvr-mirror\0";
     const OUTPUT_FLAGS: Option<u32> = None;
@@ -154,9 +167,11 @@ impl obs::source::VideoSource for OpenVRMirrorSource {
     }
 
     fn update(&self, data: &obs::sys::obs_data) {
-        let mut settings = self.settings.write().unwrap();
-        settings.update(data);
-        self.recreate_capture_context(&*settings);
+        if try_init_openvr() {
+            let mut settings = self.settings.write().unwrap();
+            settings.update(data);
+            self.recreate_capture_context(&*settings);
+        }
     }
 
     fn video_tick(&self, _seconds: f32) {

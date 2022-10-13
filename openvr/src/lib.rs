@@ -70,8 +70,13 @@ pub fn init(application_type: sys::EVRApplicationType) -> Result<InitResult, sys
         let mut e = sys::EVRInitError::non_error();
         unsafe { util::obs_openvr_init_openvr(&mut e as *mut sys::EVRInitError, application_type); }
         // unsafe { sys2::VR_InitInternal(&mut e as *mut sys::EVRInitError, application_type); }
-        e.into_empty_result()?;
-        Ok(InitResult::new(false, true))
+        match e.into_empty_result() {
+            Ok(..) => Ok(InitResult::new(false, true)),
+            Err(e) => {
+                INITIALIZED.store(false, Ordering::SeqCst);
+                Err(e)
+            },
+        }
     }
 }
 

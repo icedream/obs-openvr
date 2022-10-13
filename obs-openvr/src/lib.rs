@@ -24,6 +24,7 @@ pub use openvr::sys as openvr_sys;
 
 use std::{
     borrow::Cow,
+    sync::RwLock,
 };
 use thiserror::Error;
 
@@ -46,6 +47,31 @@ impl ObsOpenVRModule {
     }
 }
 
+static OPENVR_INIT_RESULT: RwLock<Result<(), Cow<'static, str>>> = RwLock::new(Err(Cow::Borrowed("")));
+pub fn init_openvr() -> Result<(), Cow<'static, str>> {
+    {
+        let init_result = OPENVR_INIT_RESULT.read().unwrap();
+        if init_result.is_ok() {
+            return Ok(());
+        }
+    }
+    let mut init_result = OPENVR_INIT_RESULT.write().unwrap();
+    if init_result.is_ok() {
+        return Ok(());
+    }
+    let do_init = || -> Result<(), Cow<'static, str>> {
+        let vr_initialized = openvr::init(openvr_sys::EVRApplicationType::EVRApplicationType_VRApplication_Background)
+            .map(|result| result.value())
+            .map_err(|e| Cow::Owned(format!("OpenVR failed to initialize: {:?}", &e)))?;
+        if !vr_initialized {
+            return Err(Cow::Borrowed("OpenVR failed to initialize, but with no error"));
+        }
+        Ok(())
+    };
+    *init_result = do_init();
+    init_result.clone()
+}
+
 impl obs::ObsModule for ObsOpenVRModule {
     const CRATE_NAME: &'static str = env!("CARGO_CRATE_NAME");
     type LoadErr = Cow<'static, str>;
@@ -55,12 +81,9 @@ impl obs::ObsModule for ObsOpenVRModule {
         logging::init();
         info!("logging initialized");
 
-        // Initialize OpenVR
-        let vr_initialized = openvr::init(openvr_sys::EVRApplicationType::EVRApplicationType_VRApplication_Background)
-            .map(|result| result.value())
-            .map_err(|e| Cow::Owned(format!("OpenVR failed to initialize: {:?}", &e)))?;
-        if !vr_initialized {
-            return Err(Cow::Borrowed("OpenVR failed to initialize, but with no error"));
+        // Try to Initialize OpenVR
+        if let Err(e) = init_openvr() {
+            warn!("error initializing openvr: {}", &e);
         }
 
         // Create source info struct, and register it
