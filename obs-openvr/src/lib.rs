@@ -26,10 +26,15 @@ use std::{
     borrow::Cow,
     sync::RwLock,
 };
-use thiserror::Error;
 
-#[derive(Error, Debug)]
-enum ObsOpenVRUnloadError {
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+pub enum ObsOpenVRError {
+    #[error("OpenVR initialization has not yet been attempted")]
+    InitNotAttempted,
+    #[error("OpenVR failed to initialize: {0:?}")]
+    OpenVRInit(openvr_sys::EVRInitError),
+    #[error("OpenVR failed to initialize, but with no error")]
+    OpenVRInitNoError,
     #[error("OpenVR was not actually shut down on obs_module_unload")]
     OpenVRShutdown,
 }
@@ -40,15 +45,15 @@ impl ObsOpenVRModule {
     fn unload_internal() -> Result<(), <Self as obs::ObsModule>::UnloadErr> {
         trace!("unloading");
         if !openvr::shutdown() {
-            return Err(ObsOpenVRUnloadError::OpenVRShutdown);
+            return Err(ObsOpenVRError::OpenVRShutdown);
         }
         trace!("unloaded");
         Ok(())
     }
 }
 
-static OPENVR_INIT_RESULT: RwLock<Result<(), Cow<'static, str>>> = RwLock::new(Err(Cow::Borrowed("")));
-pub fn init_openvr() -> Result<(), Cow<'static, str>> {
+static OPENVR_INIT_RESULT: RwLock<Result<(), ObsOpenVRError>> = RwLock::new(Err(ObsOpenVRError::InitNotAttempted));
+pub fn init_openvr() -> Result<(), ObsOpenVRError> {
     {
         let init_result = OPENVR_INIT_RESULT.read().unwrap();
         if init_result.is_ok() {
@@ -59,23 +64,22 @@ pub fn init_openvr() -> Result<(), Cow<'static, str>> {
     if init_result.is_ok() {
         return Ok(());
     }
-    let do_init = || -> Result<(), Cow<'static, str>> {
+    *init_result = {
         let vr_initialized = openvr::init(openvr_sys::EVRApplicationType::EVRApplicationType_VRApplication_Background)
             .map(|result| result.value())
-            .map_err(|e| Cow::Owned(format!("OpenVR failed to initialize: {:?}", &e)))?;
+            .map_err(ObsOpenVRError::OpenVRInit)?;
         if !vr_initialized {
-            return Err(Cow::Borrowed("OpenVR failed to initialize, but with no error"));
+            return Err(ObsOpenVRError::OpenVRInitNoError);
         }
         Ok(())
     };
-    *init_result = do_init();
-    init_result.clone()
+    *init_result
 }
 
 impl obs::ObsModule for ObsOpenVRModule {
     const CRATE_NAME: &'static str = env!("CARGO_CRATE_NAME");
-    type LoadErr = Cow<'static, str>;
-    type UnloadErr = ObsOpenVRUnloadError;
+    type LoadErr = ObsOpenVRError;
+    type UnloadErr = ObsOpenVRError;
     fn load() -> Result<(), Self::LoadErr> {
         // Initialize logging
         logging::init();
@@ -83,7 +87,7 @@ impl obs::ObsModule for ObsOpenVRModule {
 
         // Try to Initialize OpenVR
         if let Err(e) = init_openvr() {
-            warn!("error initializing openvr: {}", &e);
+            warn!("error initializing openvr on startup: {}", &e);
         }
 
         // Create source info struct, and register it

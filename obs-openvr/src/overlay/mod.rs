@@ -84,14 +84,14 @@ impl obs::source::VideoSource for OpenVROverlaySource {
 
         let mut props = Properties::new();
 
-        let overlay_id_name = keys::id();
+        let overlay_id_name = keys::ID;
         props.add_text(overlay_id_name, overlay_id_name, obs::sys::obs_text_type::OBS_TEXT_DEFAULT);
 
         unsafe { props.leak() }
     }
 
     fn update(&self, data: &obs::sys::obs_data) {
-        let id_key = keys::id();
+        let id_key = keys::ID;
         if let Some(id) = data.get_string(id_key).and_then(|s| CString::new(s).ok()) {
             trace!("Updating overlay source with id: {:?}", &id);
             let new_handle = match openvr::overlay::find_overlay(&id) {
@@ -147,8 +147,7 @@ impl obs::source::VideoSource for OpenVROverlaySource {
 pub(crate) mod keys {
     use std::ffi::CStr;
 
-    #[inline(always)]
-    pub fn id() -> &'static CStr {
-        unsafe { CStr::from_bytes_with_nul_unchecked(b"id\0") }
-    }
+    pub const ID: &'static CStr = unsafe {
+        CStr::from_bytes_with_nul_unchecked(b"id\0")
+    };
 }

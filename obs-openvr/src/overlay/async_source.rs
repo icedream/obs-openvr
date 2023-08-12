@@ -6,6 +6,7 @@ use std::{
         CString,
     },
     mem,
+    num::NonZeroU64,
     ptr,
     sync::{
         Arc,
@@ -78,9 +79,9 @@ pub struct OpenVRAsyncOverlaySource {
     thread: UnsafeCell<Option<JoinOnDrop<()>>>,
 }
 
-const BACKOFF_VISIBILITY: Duration = Duration::from_millis(100);
+fn spawn_overlay_thread(source: *mut obs::sys::obs_source_t, running: Arc<AtomicBool>, overlay: OverlayRef, sleep_time: Option<NonZeroU64>) -> thread::JoinHandle<()> {
+    const BACKOFF_VISIBILITY: Duration = Duration::from_millis(500);
 
-fn spawn_overlay_thread(source: *mut obs::sys::obs_source_t, running: Arc<AtomicBool>, overlay: OverlayRef) -> thread::JoinHandle<()> {
     let source = SourceHandle(source);
     running.store(true, Ordering::Relaxed);
     thread::spawn(move || {
@@ -101,8 +102,7 @@ fn spawn_overlay_thread(source: *mut obs::sys::obs_source_t, running: Arc<Atomic
             frame_data[0] = {
                 image.data().as_ptr() as *mut _
             };
-            let mut linesize = [0u32; 8];
-            linesize[0] = w * 4;
+            let linesize: [u32; 8] = [w * 4, 0, 0, 0, 0, 0, 0, 0];
             let ts = frame_time.duration_since(start_time).as_millis() as u64;
             unsafe {
                 source.output_video(&obs::sys::obs_source_frame2 {
@@ -121,18 +121,39 @@ fn spawn_overlay_thread(source: *mut obs::sys::obs_source_t, running: Arc<Atomic
                     trc: 0
                 });
             }
+            if let Some(t) = sleep_time {
+                thread::sleep(Duration::from_millis(t.get()));
+            }
         }
     })
 }
 
+fn try_init_openvr() -> bool {
+    use crate::init_openvr;
+    match init_openvr() {
+        Ok(..) => true,
+        Err(e) => {
+            warn!("failed to initialize openvr: {}", &e);
+            false
+        },
+    }
+}
+
+impl OpenVRAsyncOverlaySource {
+    const NAME: &'static CStr = unsafe {
+        CStr::from_bytes_with_nul_unchecked(b"OpenVR Overlay Source (async)\0")
+    };
+}
+
 impl AsyncVideoSource for OpenVRAsyncOverlaySource {
-    const ID: &'static [u8] = b"obs-openvr-overlay-async\0";
-    const OUTPUT_FLAGS: Option<u32> = None;
+    const ID: &'static CStr = unsafe {
+        CStr::from_bytes_with_nul_unchecked(b"obs-openvr-overlay-async\0")
+    };
 
     fn create(settings: &mut obs::sys::obs_data, source: *mut obs::sys::obs_source_t) -> Self {
         let ret = OpenVRAsyncOverlaySource {
             handle: source,
-            running: Arc::new(AtomicBool::new(true)),
+            running: Arc::new(AtomicBool::new(false)),
             thread: UnsafeCell::from(None),
         };
         ret.update(settings);
@@ -140,15 +161,19 @@ impl AsyncVideoSource for OpenVRAsyncOverlaySource {
     }
 
     fn get_name() -> &'static CStr {
-        unsafe { CStr::from_bytes_with_nul_unchecked(b"OpenVR Overlay Source (async)\0") }
+        Self::NAME
     }
 
     fn update(&self, data: &obs::sys::obs_data) {
+        if !try_init_openvr() {
+            self.running.store(false, Ordering::Relaxed);
+            return;
+        }
         let thread_handle: &mut Option<JoinOnDrop<()>> = {
             let p = self.thread.get();
             unsafe { p.as_mut().unwrap() }
         };
-        if let Some(id) = data.get_string(keys::id()).and_then(|s| CString::new(s).ok()) {
+        if let Some(id) = data.get_cstr(keys::ID) {
             trace!("Updating overlay source with id: {:?}", &id);
             let overlay = match openvr::overlay::find_overlay(&id) {
                 Ok(v) => {
@@ -163,20 +188,19 @@ impl AsyncVideoSource for OpenVRAsyncOverlaySource {
             self.running.store(false, Ordering::Relaxed);
             mem::drop(thread_handle.take());
             *thread_handle = overlay
-                .map(|overlay| spawn_overlay_thread(self.handle, self.running.clone(), overlay))
+                .map(|overlay| spawn_overlay_thread(self.handle, self.running.clone(), overlay, None))
                 .map(JoinOnDrop::from);
         }
     }
 
-    fn get_properties(&self) -> *mut obs::sys::obs_properties {
+    fn get_properties(&self) -> obs::Properties {
         use obs::properties::{
             Properties,
             PropertiesExt,
         };
         let mut props = Properties::new();
-        let id_key = keys::id();
-        props.add_text(id_key, id_key, obs::sys::obs_text_type::OBS_TEXT_DEFAULT);
-        unsafe { props.leak() }
+        props.add_text(keys::ID, keys::ID, obs::sys::obs_text_type::OBS_TEXT_DEFAULT);
+        props
     }
 }
 

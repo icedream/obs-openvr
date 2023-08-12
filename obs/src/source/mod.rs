@@ -4,6 +4,7 @@ use obs_sys as sys;
 
 use std::{
     mem,
+    num::NonZeroU32,
     ffi::CStr,
     marker::PhantomData,
 };
@@ -14,6 +15,7 @@ pub use async_video::AsyncVideoSource;
 pub struct RawSourceInfo<'a>(pub sys::obs_source_info, PhantomData<&'a ()>);
 
 impl<'a> RawSourceInfo<'a> {
+    #[inline]
     unsafe fn from_raw(info: sys::obs_source_info) -> RawSourceInfo<'a> {
         RawSourceInfo(info, PhantomData {})
     }

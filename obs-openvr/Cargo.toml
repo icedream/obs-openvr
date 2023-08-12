@@ -13,8 +13,8 @@ crate-type = ["cdylib"]
 libc = "*"
 image = "0.23"
 log = "0.4"
-env_logger = "0.8"
-thiserror = "^1.0.24"
+env_logger = "0.10"
+thiserror = "1.0"
 mcoffin-option-ext = "0.2"
 
 [dependencies.obs]
@@ -25,6 +25,7 @@ path = "../openvr"
 
 [build-dependencies]
 pkg-config = "0.3"
+thiserror = "1.0"
 
 [build-dependencies.build-profile]
 path = "../build-profile"
@@ -34,7 +35,8 @@ version = "^1.0.67"
 features = ["parallel"]
 
 [features]
-default = ["mirror-source", "overlay-source"]
+# default = ["mirror-source", "overlay-source"]
+default = ["overlay-source"]
 mirror-source = []
 overlay-source = []
 no-lock = ["openvr/no-lock"]

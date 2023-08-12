@@ -17,9 +17,12 @@ use crate::{
 
 /// Safe access functions for `sys::obs_data`
 pub trait ObsData {
-    fn get_string<'a, K: AsRef<CStr>>(&'a self, s: K) -> Option<&'a str>;
+    fn get_cstr<'a, K: AsRef<CStr>>(&'a self, key: K) -> Option<&'a CStr>;
     fn get_int<K: AsRef<CStr>>(&self, k: K) -> libc::c_longlong;
     fn get_bool<K: AsRef<CStr>>(&self, k: K) -> bool;
+    fn get_string<'a, K: AsRef<CStr>>(&'a self, key: K) -> Option<&'a str> {
+        self.get_cstr(key).and_then(|s| s.to_str().ok())
+    }
     fn get_string_enum<T: ObsEnum, K: AsRef<CStr>>(&self, k: K) -> Option<Result<T, <T as FromStr>::Err>> {
         self.get_string(k)
             .map(|s| s.parse::<T>())
@@ -37,7 +40,7 @@ pub trait ObsData {
 }
 
 impl ObsData for sys::obs_data {
-    fn get_string<'a, K: AsRef<CStr>>(&'a self, s: K) -> Option<&'a str> {
+    fn get_cstr<'a, K: AsRef<CStr>>(&'a self, s: K) -> Option<&'a CStr> {
         let s = s.as_ref();
         let self_ptr: *mut sys::obs_data = unsafe {
             mem::transmute(self as *const _)
@@ -45,14 +48,9 @@ impl ObsData for sys::obs_data {
         let ptr = unsafe {
             sys::obs_data_get_string(self_ptr, s.as_ptr())
         };
-        let ptr = if ptr.is_null() {
-            None
-        } else {
-            Some(ptr)
-        };
-        ptr
-            .map(|ptr| unsafe { CStr::from_ptr(ptr) })
-            .and_then(|s| s.to_str().ok())
+        Some(ptr)
+            .filter(|p| p.is_null())
+            .map(|p| unsafe { CStr::from_ptr(p) })
     }
     fn get_int<K: AsRef<CStr>>(&self, k: K) -> libc::c_longlong
     {
