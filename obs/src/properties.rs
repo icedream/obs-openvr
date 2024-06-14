@@ -22,13 +22,13 @@ impl<'a> StringPropertyList<'a> {
         self.0 as _
     }
 
-    pub fn add_int(&mut self, name: &'static CStr, value: libc::c_longlong) -> u64 {
+    pub fn add_int(&mut self, name: &'static CStr, value: libc::c_longlong) -> usize {
         unsafe {
             sys::obs_property_list_add_int(self.as_ptr_mut(), name.as_ptr(), value)
         }
     }
 
-    pub fn add_string(&mut self, name: &'static CStr, value: &'static CStr) -> u64 {
+    pub fn add_string(&mut self, name: &'static CStr, value: &'static CStr) -> usize {
         unsafe {
             sys::obs_property_list_add_string(self.as_ptr_mut(), name.as_ptr(), value.as_ptr())
         }
@@ -91,12 +91,12 @@ impl Properties {
 
     pub fn add_string_list<'a>(&'a mut self, header: PropertyDescription<'static>, editable: bool) -> StringPropertyList<'a> {
         let combo_type = if editable {
-            sys::obs_combo_type::OBS_COMBO_TYPE_EDITABLE
+            sys::obs_combo_type_OBS_COMBO_TYPE_EDITABLE
         } else {
-            sys::obs_combo_type::OBS_COMBO_TYPE_LIST
+            sys::obs_combo_type_OBS_COMBO_TYPE_LIST
         };
         unsafe {
-            let ptr = sys::obs_properties_add_list(self.deref_mut() as _, header.name.as_ptr(), header.description.as_ptr(), combo_type, sys::obs_combo_format::OBS_COMBO_FORMAT_STRING);
+            let ptr = sys::obs_properties_add_list(self.deref_mut() as _, header.name.as_ptr(), header.description.as_ptr(), combo_type, sys::obs_combo_format_OBS_COMBO_FORMAT_STRING);
             StringPropertyList::from_ptr(ptr).unwrap()
         }
     }

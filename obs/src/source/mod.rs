@@ -77,7 +77,7 @@ pub trait VideoSource: Sized {
 
     fn raw_source_info() -> RawSourceInfo<'static> {
         let id: &'static CStr = CStr::from_bytes_with_nul(Self::ID).unwrap();
-        let mut info = empty_source_info(id, sys::obs_source_type::OBS_SOURCE_TYPE_INPUT, Some(video_source_output_flags::<Self>()));
+        let mut info = empty_source_info(id, sys::obs_source_type_OBS_SOURCE_TYPE_INPUT, Some(video_source_output_flags::<Self>()));
         info.0.get_name = Some(video_source_get_name::<Self>);
         info.0.get_width = Some(video_source_get_width::<Self>);
         info.0.get_height = Some(video_source_get_height::<Self>);

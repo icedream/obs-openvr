@@ -36,7 +36,7 @@ pub trait AsyncVideoSource: Sized {
         unsafe {
             let ret = sys::obs_source_info {
                 id: Self::ID.as_ptr(),
-                type_: sys::obs_source_type::OBS_SOURCE_TYPE_INPUT,
+                type_: sys::obs_source_type_OBS_SOURCE_TYPE_INPUT,
                 output_flags: output_flags::<Self>(),
                 get_name: Some(async_video_source_get_name::<Self>),
                 update: Some(async_video_source_update::<Self>),

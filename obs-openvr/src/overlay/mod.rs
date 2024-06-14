@@ -85,7 +85,7 @@ impl obs::source::VideoSource for OpenVROverlaySource {
         let mut props = Properties::new();
 
         let overlay_id_name = keys::ID;
-        props.add_text(overlay_id_name, overlay_id_name, obs::sys::obs_text_type::OBS_TEXT_DEFAULT);
+        props.add_text(overlay_id_name, overlay_id_name, obs::sys::obs_text_type_OBS_TEXT_DEFAULT);
 
         unsafe { props.leak() }
     }
@@ -127,7 +127,7 @@ impl obs::source::VideoSource for OpenVROverlaySource {
                 },
                 texture => unsafe {
                     let (w, h) = self.dimensions.get();
-                    *texture = obs::graphics::Texture::new(w, h, obs::sys::gs_color_format::GS_BGRA, &[image.data().as_ptr()], obs::sys::GS_DYNAMIC);
+                    *texture = obs::graphics::Texture::new(w, h, obs::sys::gs_color_format_GS_BGRA, &[image.data().as_ptr()], obs::sys::GS_DYNAMIC);
                     if texture.is_none() {
                         error!("Error creating obs texture from image data");
                     }

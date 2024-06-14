@@ -111,8 +111,8 @@ fn spawn_overlay_thread(source: *mut obs::sys::obs_source_t, running: Arc<Atomic
                     width: w,
                     height: h,
                     timestamp: ts,
-                    format: obs::sys::video_format::VIDEO_FORMAT_BGRA,
-                    range: obs::sys::video_range_type::VIDEO_RANGE_DEFAULT,
+                    format: obs::sys::video_format_VIDEO_FORMAT_BGRA,
+                    range: obs::sys::video_range_type_VIDEO_RANGE_DEFAULT,
                     color_matrix: [0.0; 16],
                     color_range_min: [0.0; 3],
                     color_range_max: [0.0; 3],
@@ -199,7 +199,7 @@ impl AsyncVideoSource for OpenVRAsyncOverlaySource {
             PropertiesExt,
         };
         let mut props = Properties::new();
-        props.add_text(keys::ID, keys::ID, obs::sys::obs_text_type::OBS_TEXT_DEFAULT);
+        props.add_text(keys::ID, keys::ID, obs::sys::obs_text_type_OBS_TEXT_DEFAULT);
         props
     }
 }
